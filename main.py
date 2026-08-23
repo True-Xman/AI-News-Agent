@@ -25,7 +25,10 @@ async def main():
     
     # 3. Sieve
     print("🔍 Running Sieve (Filter)...")
-    await run_sieve()
+    success = await run_sieve()
+    if not success:
+        print("❌ Pipeline stopped due to Gemini quota exhaustion.")
+        return
     
     # 4. Scout
     print("🧠 Running Scout (Analysis)...")
