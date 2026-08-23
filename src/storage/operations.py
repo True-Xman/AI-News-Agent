@@ -22,7 +22,7 @@ def insert_raw_signal(signal: RawSignal):
     finally:
         conn.close()
 
-def get_unprocessed_raw_signals(total_limit=50):
+def get_unprocessed_raw_signals(limit=None):
     conn = get_connection()
     cursor = conn.cursor()
     # Fetch a larger pool to allow for balancing
@@ -48,6 +48,10 @@ def get_unprocessed_raw_signals(total_limit=50):
         count = min(len(rows), max_per_org)
         balanced_rows.extend(rows[:count])
         logger.info(f" - {org}: {count} signals")
+    
+    # Apply limit after balancing if provided
+    if limit:
+        return balanced_rows[:limit]
     
     return balanced_rows
 
