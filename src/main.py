@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import uuid
 
 # Configure UTF-8 for console output on Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -25,6 +26,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("AI-Signal-Scout")
 
 async def run_pipeline():
+    run_id = str(uuid.uuid4())
+    logger.info(f"Pipeline run_id: {run_id}")
     logger.info("Starting AI Signal Scout Pipeline...")
 
     # 1. Initialize Database
@@ -36,7 +39,7 @@ async def run_pipeline():
     total_collected = 0
     for src in sources:
         try:
-            signals = collect_rss(src)
+            signals = collect_rss(src, run_id=run_id)
             total_collected += len(signals)
             logger.info(f"Fetched {len(signals)} items from {src.name}")
         except Exception as e:
@@ -48,7 +51,7 @@ async def run_pipeline():
     unprocessed = get_unprocessed_raw_signals(run_id=run_id, limit=50)
     if unprocessed:
         logger.info(f"Running Sieve filtering on {len(unprocessed)} raw signals...")
-        success = await run_sieve()
+        success = await run_sieve(run_id=run_id)
         if not success:
             logger.error("Pipeline stopped due to Gemini quota exhaustion.")
             return
@@ -56,10 +59,10 @@ async def run_pipeline():
         logger.info("No unprocessed raw signals for Sieve filtering.")
 
     # 4. Scout Analysis & Scoring (Gemini Flash)
-    keep_signals = get_keep_signals()
+    keep_signals = get_keep_signals(run_id=run_id)
     if keep_signals:
         logger.info(f"Running Scout deep analysis on {len(keep_signals)} candidate signals...")
-        await run_scout()
+        await run_scout(run_id=run_id)
     else:
         logger.info("No candidate signals ready for Scout analysis.")
 

@@ -25,7 +25,7 @@ def format_persian_report(signals: List[Dict]) -> str:
         Formatted Persian report string.
     """
     if not signals:
-        return "🤖 AI Signal Scout\nگزارش هوش مصنوعی روزانه\n\nهیچ سیگنالی برای گزارش یافت نشد."
+        return ""
 
     header = "🤖 AI Signal Scout\nگزارش هوش مصنوعی روزانه\n"
     report_parts = [header]

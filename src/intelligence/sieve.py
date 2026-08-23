@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 with open("prompts/sieve_prompt.md", "r", encoding="utf-8") as f:
     SIEVE_PROMPT_TEMPLATE = f.read()
 
-async def run_sieve():
-    rows = get_unprocessed_raw_signals(50) # Increase pull size to allow better selection diversity
+async def run_sieve(run_id: str):
+    rows = get_unprocessed_raw_signals(run_id=run_id, limit=50) # Increase pull size to allow better selection diversity
     # Debug log: check distribution
     from collections import Counter
     source_counts = Counter([get_organization(None, row[2]) for row in rows])
@@ -111,7 +111,8 @@ async def run_sieve():
                         decision, 
                         item.get("reason", ""), 
                         item.get("confidence", 0.0),
-                        item.get("scores")
+                        item.get("scores"),
+                        run_id=run_id
                     )
         except Exception as e:
             if "quota" in str(e).lower() or "exceeded" in str(e).lower():

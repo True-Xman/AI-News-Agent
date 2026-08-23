@@ -31,9 +31,9 @@ class TestPersianReportFormatter(unittest.TestCase):
         self.assertTrue(result.startswith("🤖 AI Signal Scout\nگزارش هوش مصنوعی روزانه\n"))
 
     def test_formatter_empty_signals(self):
-        """Test that formatting empty signals returns a no-signal message."""
+        """Test that formatting empty signals returns an empty report message."""
         result = format_persian_report([])
-        self.assertIn("هیچ سیگنالی برای گزارش یافت نشد", result)
+        self.assertEqual(result, "")
 
     def test_formatter_missing_fields(self):
         """Test that missing fields are handled gracefully."""

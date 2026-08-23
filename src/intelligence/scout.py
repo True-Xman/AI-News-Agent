@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 with open("prompts/scout_prompt.md", "r", encoding="utf-8") as f:
     SCOUT_PROMPT_TEMPLATE = f.read()
 
-async def run_scout():
-    rows = get_keep_signals()
+async def run_scout(run_id: str):
+    rows = get_keep_signals(run_id=run_id)
     if not rows:
         return
     
@@ -109,7 +109,8 @@ async def run_scout():
                 url=signal["source_url"],
                 score=signal["score"],
                 topic_fingerprint=signal["title"],
-                analysis_json=signal
+                analysis_json=signal,
+                run_id=run_id
             )
     except Exception as e:
         logger.error(f"Error scouting: {e}")

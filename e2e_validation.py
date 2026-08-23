@@ -1,4 +1,4 @@
-import os, sys, json, time
+import os, sys, json, time, uuid
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -45,11 +45,12 @@ def run_end_to_end_validation():
     init_db()
     sources = load_sources("sources.yaml")
     print(f"  - Loaded {len(sources)} sources from sources.yaml.")
+    run_id = str(uuid.uuid4())
     
     collected_count, fetched_sources = 0, 0
     for src in sources:
         try:
-            signals = collect_rss(src)
+            signals = collect_rss(src, run_id=run_id)
             fetched_sources += 1
             collected_count += len(signals)
             print(f"    [SUCCESS] {src.name}: Collected {len(signals)} items")
@@ -58,10 +59,10 @@ def run_end_to_end_validation():
 
     dup_url = "https://example.com/dup-test"
     dup = RawSignal(url=dup_url, title="Dup Test", source="Test", source_id=1, found_at=time.time())
-    insert_raw_signal(dup)
-    insert_raw_signal(dup)
+    insert_raw_signal(dup, run_id)
+    insert_raw_signal(dup, run_id)
     
-    unprocessed = get_unprocessed_raw_signals(limit=100)
+    unprocessed = get_unprocessed_raw_signals(run_id, limit=100)
     print(f"  - Total raw signals in DB: {len(unprocessed)}")
 
     # 3. Sieve Layer (Filtering)
