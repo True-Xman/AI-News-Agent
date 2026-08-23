@@ -18,12 +18,26 @@ async def send_gemini_request(prompt: str, max_retries: int = 3) -> str:
             )
             return response.text
         except APIError as e:
-            # 429: Resource Exhausted, 503: Service Unavailable
-            if e.code in [429, 503] and attempt < max_retries - 1:
-                wait = (2 ** attempt)  # 1, 2, 4 seconds
-                print(f"Gemini API error {e.code}, retrying in {wait}s...")
+            # 429: Resource Exhausted (Check status message for daily quota)
+            if e.code == 429:
+                if "daily" in str(e).lower() or "quota" in str(e).lower():
+                    print(f"Gemini Daily Quota Exhausted: {e}")
+                    return "" # Do not retry
+                
+                # Temporary rate limit
+                if attempt < max_retries - 1:
+                    wait = (2 ** attempt)  # 1, 2, 4 seconds
+                    print(f"Gemini Rate Limit (429), retrying in {wait}s...")
+                    await asyncio.sleep(wait)
+                    continue
+            
+            # 503: Service Unavailable
+            elif e.code == 503 and attempt < max_retries - 1:
+                wait = (2 ** attempt)
+                print(f"Gemini Service Unavailable (503), retrying in {wait}s...")
                 await asyncio.sleep(wait)
                 continue
+            
             raise
     return ""
 

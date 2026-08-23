@@ -6,14 +6,25 @@ with open("prompts/sieve_prompt.md", "r") as f:
     SIEVE_PROMPT_TEMPLATE = f.read()
 
 async def run_sieve():
-    rows = get_unprocessed_raw_signals(20)
+    rows = get_unprocessed_raw_signals(25) # Limit to 25
     if not rows:
+        return
+
+    # Pre-filter logic: Keep only relevant signals based on title keywords
+    keywords = ["AI", "agent", "security", "model", "research", "LLM", "safety", "vulnerability"]
+    filtered_rows = []
+    for row in rows:
+        title = row[1]
+        if any(kw.lower() in title.lower() for kw in keywords):
+            filtered_rows.append(row)
+    
+    if not filtered_rows:
         return
 
     # Batch process signals (e.g., 5 at a time)
     batch_size = 5
-    for i in range(0, len(rows), batch_size):
-        batch = rows[i:i + batch_size]
+    for i in range(0, len(filtered_rows), batch_size):
+        batch = filtered_rows[i:i + batch_size]
         
         candidates = []
         for row in batch:
