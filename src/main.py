@@ -46,6 +46,18 @@ async def run_pipeline():
             logger.error(f"Error fetching source {src.name}: {e}")
 
     logger.info(f"Total raw signals collected in this run: {total_collected}")
+    # Diagnostic logging: check raw_signals for this run_id
+    from src.storage.database import get_connection
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM raw_signals WHERE run_id = ?", (run_id,))
+    count_total = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM raw_signals WHERE run_id = ? AND filter_decision IS NULL", (run_id,))
+    count_unprocessed = cursor.fetchone()[0]
+    conn.close()
+    logger.info(f"Diagnostic: run_id={run_id}")
+    logger.info(f"Diagnostic: total raw_signals for this run_id = {count_total}")
+    logger.info(f"Diagnostic: raw_signals with filter_decision IS NULL = {count_unprocessed}")
 
     # 3. Sieve Noise Filtering (Gemini Flash)
     unprocessed = get_unprocessed_raw_signals(run_id=run_id, limit=50)

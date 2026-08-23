@@ -25,8 +25,8 @@ def insert_raw_signal(signal: RawSignal, run_id: str):
 def get_unprocessed_raw_signals(run_id: str, limit=None):
     conn = get_connection()
     cursor = conn.cursor()
-    # Fetch a larger pool to allow for balancing
-    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision IS NULL AND run_id = ?", (run_id,))
+    # Migration-safe: include both specific run_id and legacy NULL run_id
+    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision IS NULL AND (run_id = ? OR run_id IS NULL)", (run_id,))
     all_rows = cursor.fetchall()
     conn.close()
     
@@ -70,7 +70,8 @@ def update_signal_filter(url_hash: str, decision: str, reason: str, confidence: 
 def get_keep_signals(run_id: str):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision = 'KEEP' AND url_hash NOT IN (SELECT url FROM processed_signals WHERE run_id = ?) AND run_id = ?", (run_id, run_id))
+    # Migration-safe: include both specific run_id and legacy NULL run_id
+    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision = 'KEEP' AND url_hash NOT IN (SELECT url FROM processed_signals WHERE run_id = ?) AND (run_id = ? OR run_id IS NULL)", (run_id, run_id))
     rows = cursor.fetchall()
     conn.close()
     return rows

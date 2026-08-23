@@ -81,7 +81,7 @@ def run_end_to_end_validation():
 
     # 4. Scout Layer (Analysis)
     print("\n[4/6] Running Scout Layer (Analysis & Scoring)...")
-    keep_signals = get_keep_signals()
+    keep_signals = get_keep_signals(run_id)
     scouted_count = 0
     for row in keep_signals[:10]:
         title = row[1]
@@ -95,7 +95,7 @@ def run_end_to_end_validation():
             "source_url": f"https://example.com/signal/{abs(hash(title))}",
             "score_breakdown": {"capability_shift": 0.85, "real_world_impact": 0.80}
         }
-        insert_processed_signal(title, f"https://example.com/signal/{abs(hash(title))}", analysis["score"], title, analysis)
+        insert_processed_signal(title, f"https://example.com/signal/{abs(hash(title))}", analysis["score"], title, json.dumps(analysis), run_id)
         scouted_count += 1
 
     print(f"  - Scouted & stored {scouted_count} signals.")
