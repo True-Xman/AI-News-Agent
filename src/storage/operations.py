@@ -1,7 +1,13 @@
 import hashlib
+import json
+import logging
 from .database import get_connection
 from ..models.raw_signal import RawSignal
-import json
+from ..utils.organization import get_organization
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def insert_raw_signal(signal: RawSignal):
     conn = get_connection()
@@ -16,14 +22,34 @@ def insert_raw_signal(signal: RawSignal):
     finally:
         conn.close()
 
-def get_unprocessed_raw_signals(limit=10):
+def get_unprocessed_raw_signals(total_limit=50):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision IS NULL LIMIT ?", (limit,))
-    rows = cursor.fetchall()
+    # Fetch a larger pool to allow for balancing
+    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision IS NULL")
+    all_rows = cursor.fetchall()
     conn.close()
-    # Simplified mapping
-    return rows
+    
+    if not all_rows:
+        return []
+
+    # Group by organization
+    by_source = {}
+    for row in all_rows:
+        source_org = get_organization(None, row[2] or "unknown")
+        by_source.setdefault(source_org, []).append(row)
+
+    # Balance retrieval (e.g., max 20 per organization)
+    max_per_org = 20
+    balanced_rows = []
+    
+    logger.info("Sieve: Fetching balanced pool by organization:")
+    for org, rows in by_source.items():
+        count = min(len(rows), max_per_org)
+        balanced_rows.extend(rows[:count])
+        logger.info(f" - {org}: {count} signals")
+    
+    return balanced_rows
 
 def update_signal_filter(url_hash, decision, reason, confidence=0.0, scores=None):
     conn = get_connection()
@@ -35,6 +61,7 @@ def update_signal_filter(url_hash, decision, reason, confidence=0.0, scores=None
     """, (decision, reason, confidence, json.dumps(scores) if scores else None, url_hash))
     conn.commit()
     conn.close()
+...
 
 def get_keep_signals():
     conn = get_connection()
