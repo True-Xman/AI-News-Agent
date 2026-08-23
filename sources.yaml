@@ -4,19 +4,19 @@
 sources:
   # Official AI Lab Announcements
   - name: OpenAI Blog
-    url: https://openai.com/blog/feed/
+    url: https://openai.com/news/rss
     type: rss
     priority: 1
     category: official
 
   - name: Anthropic Blog
-    url: https://www.anthropic.com/news/rss
+    url: https://www.anthropic.com/feed.xml
     type: rss
     priority: 2
     category: official
 
   - name: DeepMind Blog
-    url: https://deepmind.com/blog/rss
+    url: https://deepmind.google/blog/feed/
     type: rss
     priority: 3
     category: official
@@ -36,7 +36,7 @@ sources:
 
   # Industry News
   - name: TechCrunch AI RSS
-    url: https://techcrunch.com/category/ai/feed/
+    url: https://techcrunch.com/category/artificial-intelligence/feed/
     type: rss
     priority: 6
     category: industry
