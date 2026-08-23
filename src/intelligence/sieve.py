@@ -13,6 +13,14 @@ with open("prompts/sieve_prompt.md", "r") as f:
 
 async def run_sieve():
     rows = get_unprocessed_raw_signals(50) # Increase pull size to allow better selection diversity
+    # Debug log: check distribution
+    from collections import Counter
+    source_counts = Counter([get_organization(None, row[2]) for row in rows])
+    logger.info(f"Sieve: Raw signals loaded: {len(rows)}. Distribution: {dict(source_counts)}")
+    for org, count in source_counts.items():
+        sample = [row[1] for row in rows if get_organization(None, row[2]) == org][:2]
+        logger.info(f"Sieve: Sample from {org}: {sample}")
+
     if not rows:
         return
 
@@ -30,6 +38,19 @@ async def run_sieve():
     logger.info(f"Sieve: Candidates before diversity selection: {len(filtered_rows)}")
 
     # Group filtered candidates by detected source/organization to distribute and select a diverse subset
+    # Detailed Logging
+    for i, row in enumerate(filtered_rows):
+        # Assuming row structure based on insert_raw_signal:
+        # 0: url_hash, 1: title, 2: source, 3: source_id, 4: found_at, 5: snippet
+        # But wait, raw_signals table has more columns...
+        # Let's check the schema again. 
+        # Column count: url_hash (0), title (1), source (2), source_id (3), found_at (4), snippet (5)
+        # Yes, row[0] is hash, row[1] is title, row[2] is source
+        
+        # Actually, let's log everything
+        logger.info(f"Signal {i}: Title: {row[1]}, Source: {row[2]}, URL Hash: {row[0]}")
+    
+
     by_source = {}
     for row in filtered_rows:
         # row[0] is url_hash, row[1] is title, row[2] is raw source description
