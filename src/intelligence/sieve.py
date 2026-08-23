@@ -114,5 +114,8 @@ async def run_sieve():
                         item.get("scores")
                     )
         except Exception as e:
+            if "quota" in str(e).lower() or "exceeded" in str(e).lower():
+                logger.error("Sieve stopped due to Gemini quota exhaustion.")
+                break
             logger.error(f"Error sieving batch starting with {batch[0][1]}: {e}")
 
