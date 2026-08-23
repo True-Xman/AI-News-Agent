@@ -39,15 +39,45 @@ async def run_scout():
         end = response_text.rfind("}") + 1
         data = json.loads(response_text[start:end])
         
-        # Sort and take top 3 results for output
-        sorted_signals = sorted(data.get("selected_signals", []), key=lambda x: x.get("score", 0), reverse=True)
-        top_signals = sorted_signals[:3]
+        # Sort and apply diversity filtering
+        all_signals = data.get("selected_signals", [])
+        logger.info(f"Scout: Candidates before diversity filtering: {len(all_signals)}")
+        
+        # Diversity Penalty: Reduce score for subsequent items from the same source
+        # Sort initially by raw score
+        ranked_signals = sorted(all_signals, key=lambda x: x.get("score", 0), reverse=True)
+        
+        diversity_adjusted_signals = []
+        seen_sources = {}
+        
+        for sig in ranked_signals:
+            source = sig.get("source", "unknown")
+            raw_score = sig.get("score", 0)
+            
+            # Diversity Penalty: Apply only if score > 70 (high impact threshold)
+            # Reduce penalty to 10% incremental
+            if raw_score > 70:
+                penalty = seen_sources.get(source, 0) * 0.10
+                adjusted_score = raw_score - (raw_score * penalty)
+            else:
+                adjusted_score = raw_score
+                
+            sig["adjusted_score"] = adjusted_score
+            diversity_adjusted_signals.append(sig)
+            seen_sources[source] = seen_sources.get(source, 0) + 1
+            
+        # Re-sort by adjusted score
+        final_ranked = sorted(diversity_adjusted_signals, key=lambda x: x.get("adjusted_score", 0), reverse=True)
+        top_signals = final_ranked[:3]
+        
+        represented_sources = {s.get("source") for s in top_signals}
+        logger.info(f"Scout: Final top {len(top_signals)} signals. Represented sources: {represented_sources}")
         
         for signal in top_signals:
             insert_processed_signal(
                 title=signal["title"],
                 url=signal["source_url"],
-                score=signal["score"],
+                score=signal["adjusted_score"],
                 topic_fingerprint=signal["title"],
                 analysis_json=signal
             )
