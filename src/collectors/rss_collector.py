@@ -8,7 +8,7 @@ from ..storage.operations import insert_raw_signal
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def collect_rss(source_item):
+def collect_rss(source_item, run_id):
     logger.info(f"Fetching {source_item.name} from {source_item.url}")
     feed = feedparser.parse(source_item.url)
     
@@ -30,7 +30,7 @@ def collect_rss(source_item):
                 found_at=time.mktime(entry.get("published_parsed", time.localtime())),
                 snippet=entry.get("summary", "")
             )
-            insert_raw_signal(signal)
+            insert_raw_signal(signal, run_id)
             signals.append(signal)
         except Exception as e:
             logger.error(f"Failed to process entry in {source_item.name}: {e}")

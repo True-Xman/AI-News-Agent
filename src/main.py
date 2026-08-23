@@ -45,7 +45,7 @@ async def run_pipeline():
     logger.info(f"Total raw signals collected in this run: {total_collected}")
 
     # 3. Sieve Noise Filtering (Gemini Flash)
-    unprocessed = get_unprocessed_raw_signals(limit=50)
+    unprocessed = get_unprocessed_raw_signals(run_id=run_id, limit=50)
     if unprocessed:
         logger.info(f"Running Sieve filtering on {len(unprocessed)} raw signals...")
         success = await run_sieve()
