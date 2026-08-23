@@ -1,14 +1,29 @@
 import os
+import time
+import asyncio
 from google import genai
+from google.genai.errors import APIError
 
 # Initialize client pointing to Gemini API
 # Uses GOOGLE_API_KEY from environment
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
-async def send_gemini_request(prompt: str) -> str:
-    """Send prompt to Gemini via official google-genai SDK."""
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-    return response.text
+async def send_gemini_request(prompt: str, max_retries: int = 3) -> str:
+    """Send prompt to Gemini with exponential backoff for 429/503 errors."""
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
+            return response.text
+        except APIError as e:
+            # 429: Resource Exhausted, 503: Service Unavailable
+            if e.code in [429, 503] and attempt < max_retries - 1:
+                wait = (2 ** attempt)  # 1, 2, 4 seconds
+                print(f"Gemini API error {e.code}, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                continue
+            raise
+    return ""
+
