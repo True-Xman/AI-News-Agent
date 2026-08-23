@@ -28,17 +28,17 @@ async def run_scout():
         end = response_text.rfind("}") + 1
         data = json.loads(response_text[start:end])
         
-    # Sort signals by score descending and take only top 5
-    sorted_signals = sorted(data.get("selected_signals", []), key=lambda x: x.get("score", 0), reverse=True)
-    top_signals = sorted_signals[:5]
-    
-    for signal in top_signals:
-        insert_processed_signal(
-            title=signal["title"],
-            url=signal["source_url"],
-            score=signal["score"],
-            topic_fingerprint=signal["title"], # Simple fingerprint
-            analysis_json=signal
-        )
+        # Sort signals by score descending and take only top 5
+        sorted_signals = sorted(data.get("selected_signals", []), key=lambda x: x.get("score", 0), reverse=True)
+        top_signals = sorted_signals[:5]
+        
+        for signal in top_signals:
+            insert_processed_signal(
+                title=signal["title"],
+                url=signal["source_url"],
+                score=signal["score"],
+                topic_fingerprint=signal["title"], # Simple fingerprint
+                analysis_json=signal
+            )
     except Exception as e:
         print(f"Error scouting: {e}")
