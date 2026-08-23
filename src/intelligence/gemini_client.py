@@ -20,9 +20,9 @@ async def send_gemini_request(prompt: str, max_retries: int = 3) -> str:
         except APIError as e:
             # 429: Resource Exhausted (Check status message for daily quota)
             if e.code == 429:
-                if "daily" in str(e).lower() or "quota" in str(e).lower():
+                if "daily" in str(e).lower() or "quota" in str(e).lower() or "exceeded" in str(e).lower():
                     print(f"Gemini Daily Quota Exhausted: {e}")
-                    return "" # Do not retry
+                    raise # Raise to stop retries entirely for quota
                 
                 # Temporary rate limit
                 if attempt < max_retries - 1:
