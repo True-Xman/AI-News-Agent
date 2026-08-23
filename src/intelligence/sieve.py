@@ -8,7 +8,7 @@ from ..storage.operations import get_unprocessed_raw_signals, update_signal_filt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-with open("prompts/sieve_prompt.md", "r") as f:
+with open("prompts/sieve_prompt.md", "r", encoding="utf-8") as f:
     SIEVE_PROMPT_TEMPLATE = f.read()
 
 async def run_sieve():

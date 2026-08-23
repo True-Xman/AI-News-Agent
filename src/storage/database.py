@@ -33,9 +33,15 @@ def init_db():
         filter_reason TEXT,
         filter_confidence REAL,
         filter_scores TEXT,
-        filter_processed_at TEXT
+        filter_processed_at TEXT,
+        url TEXT,
+        run_id TEXT
     )
     """)
+    try:
+        cursor.execute("ALTER TABLE raw_signals ADD COLUMN run_id TEXT")
+    except sqlite3.OperationalError:
+        pass
     
     # Processed signals table
     cursor.execute("""
@@ -46,9 +52,14 @@ def init_db():
         score REAL,
         topic_fingerprint TEXT,
         analysis_json TEXT,
-        reported_at TEXT
+        reported_at TEXT,
+        run_id TEXT
     )
     """)
+    try:
+        cursor.execute("ALTER TABLE processed_signals ADD COLUMN run_id TEXT")
+    except sqlite3.OperationalError:
+        pass
     
     conn.commit()
     conn.close()
