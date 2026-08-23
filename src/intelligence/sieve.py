@@ -1,6 +1,7 @@
 import json
 import logging
 from .gemini_client import send_gemini_request
+from ..utils.organization import get_organization
 from ..storage.operations import get_unprocessed_raw_signals, update_signal_filter
 
 # Configure logging
@@ -28,11 +29,13 @@ async def run_sieve():
 
     logger.info(f"Sieve: Candidates before diversity selection: {len(filtered_rows)}")
 
-    # Group filtered candidates by source to distribute and select a diverse subset
+    # Group filtered candidates by detected source/organization to distribute and select a diverse subset
     by_source = {}
     for row in filtered_rows:
-        source = row[2] or "unknown"
-        by_source.setdefault(source, []).append(row)
+        # row[0] is url_hash, row[1] is title, row[2] is raw source description
+        # We don't store full URL in raw_signals table, so we pass fallback (row[2]) to get_organization
+        source_org = get_organization(None, row[2] or "unknown")
+        by_source.setdefault(source_org, []).append(row)
 
     # Round-robin selection of candidates to ensure high diversity up to a maximum of 25 candidates
     selected_rows = []
@@ -46,8 +49,9 @@ async def run_sieve():
             if len(selected_rows) >= 25:
                 break
 
-    represented_orgs = {row[2] or "unknown" for row in selected_rows}
+    represented_orgs = {get_organization(None, row[2] or "unknown") for row in selected_rows}
     logger.info(f"Sieve: Final candidates sent to Sieve (Gemini): {len(selected_rows)}. Organizations represented: {represented_orgs}")
+
 
     # Batch process signals (e.g., 5 at a time)
     batch_size = 5

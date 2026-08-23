@@ -1,26 +1,7 @@
 import json
 import logging
 from .gemini_client import send_gemini_request
-from urllib.parse import urlparse
-
-def get_organization(url: str, fallback: str) -> str:
-    """Infer organization name from URL domain."""
-    if not url:
-        return fallback
-    try:
-        domain = urlparse(url).netloc.lower()
-        if "openai" in domain: return "OpenAI"
-        if "anthropic" in domain: return "Anthropic"
-        if "deepmind" in domain or "google" in domain: return "Google DeepMind"
-        if "meta" in domain or "facebook" in domain: return "Meta"
-        if "arxiv" in domain: return "arXiv"
-        if "techcrunch" in domain: return "TechCrunch"
-        if "theverge" in domain: return "The Verge"
-        if "langchain" in domain: return "LangChain"
-    except:
-        pass
-    return fallback
-
+from ..utils.organization import get_organization
 from ..storage.operations import get_keep_signals, insert_processed_signal
 
 # Configure logging
@@ -111,3 +92,4 @@ async def run_scout():
             )
     except Exception as e:
         logger.error(f"Error scouting: {e}")
+
