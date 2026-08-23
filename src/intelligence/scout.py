@@ -1,6 +1,26 @@
 import json
 import logging
 from .gemini_client import send_gemini_request
+from urllib.parse import urlparse
+
+def get_organization(url: str, fallback: str) -> str:
+    """Infer organization name from URL domain."""
+    if not url:
+        return fallback
+    try:
+        domain = urlparse(url).netloc.lower()
+        if "openai" in domain: return "OpenAI"
+        if "anthropic" in domain: return "Anthropic"
+        if "deepmind" in domain or "google" in domain: return "Google DeepMind"
+        if "meta" in domain or "facebook" in domain: return "Meta"
+        if "arxiv" in domain: return "arXiv"
+        if "techcrunch" in domain: return "TechCrunch"
+        if "theverge" in domain: return "The Verge"
+        if "langchain" in domain: return "LangChain"
+    except:
+        pass
+    return fallback
+
 from ..storage.operations import get_keep_signals, insert_processed_signal
 
 # Configure logging
@@ -54,9 +74,10 @@ async def run_scout():
             if len(top_signals) >= 3:
                 break
                 
-            source = sig.get("source", "unknown")
+            source = get_organization(sig.get("source_url"), sig.get("source", "unknown"))
             raw_score = sig.get("score", 0)
             
+            logger.info(f"Scout: Analyzing '{sig.get('title')}' - Detected Org: {source}")
             # Condition 1: New source
             # Condition 2: Repeated source only if it's significantly higher (>15 points) than the last added signal
             #              or if we are desperate to fill slots (not reached 3 signals) and no other unique source left.
