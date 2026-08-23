@@ -1,0 +1,62 @@
+# AI Signal Scout Source Configuration
+# Externalized source definitions for the AI News Agent
+
+sources:
+  # Official AI Lab Announcements
+  - name: OpenAI Blog
+    url: https://openai.com/blog/feed/
+    type: rss
+    priority: 1
+    category: official
+
+  - name: Anthropic Blog
+    url: https://www.anthropic.com/news/rss
+    type: rss
+    priority: 2
+    category: official
+
+  - name: DeepMind Blog
+    url: https://deepmind.com/blog/rss
+    type: rss
+    priority: 3
+    category: official
+
+  # Research Sources
+  - name: arXiv cs.AI
+    url: http://export.arxiv.org/rss/cs.AI
+    type: rss
+    priority: 4
+    category: research
+
+  - name: arXiv cs.CL
+    url: http://export.arxiv.org/rss/cs.CL
+    type: rss
+    priority: 5
+    category: research
+
+  # Industry News
+  - name: TechCrunch AI RSS
+    url: https://techcrunch.com/category/ai/feed/
+    type: rss
+    priority: 6
+    category: industry
+
+  - name: The Verge AI RSS
+    url: https://www.theverge.com/ai-artificial-intelligence/rss/index.xml
+    type: rss
+    priority: 7
+    category: industry
+
+  # Agent Ecosystem
+  - name: LangGraph Blog
+    url: https://blog.langchain.dev/rss
+    type: rss
+    priority: 8
+    category: agents
+
+  # Security & Risks
+  - name: OWASP GenAI
+    url: https://owasp.org/feed.xml
+    type: rss
+    priority: 9
+    category: security
