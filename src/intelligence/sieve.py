@@ -22,7 +22,7 @@ async def run_sieve():
         logger.info(f"Sieve: Sample from {org}: {sample}")
 
     if not rows:
-        return
+        return False # Indicate failure/stop
 
     # Pre-filter logic: Keep only relevant signals based on title keywords
     keywords = ["AI", "agent", "security", "model", "research", "LLM", "safety", "vulnerability"]
@@ -33,7 +33,7 @@ async def run_sieve():
             filtered_rows.append(row)
     
     if not filtered_rows:
-        return
+        return True # Finished, but nothing to keep
 
     logger.info(f"Sieve: Candidates before diversity selection: {len(filtered_rows)}")
 
@@ -116,6 +116,7 @@ async def run_sieve():
         except Exception as e:
             if "quota" in str(e).lower() or "exceeded" in str(e).lower():
                 logger.error("Sieve stopped due to Gemini quota exhaustion.")
-                break
+                return False
             logger.error(f"Error sieving batch starting with {batch[0][1]}: {e}")
+    return True
 

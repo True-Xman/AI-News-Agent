@@ -48,7 +48,10 @@ async def run_pipeline():
     unprocessed = get_unprocessed_raw_signals(limit=50)
     if unprocessed:
         logger.info(f"Running Sieve filtering on {len(unprocessed)} raw signals...")
-        await run_sieve()
+        success = await run_sieve()
+        if not success:
+            logger.error("Pipeline stopped due to Gemini quota exhaustion.")
+            return
     else:
         logger.info("No unprocessed raw signals for Sieve filtering.")
 
