@@ -43,41 +43,48 @@ async def run_scout():
         all_signals = data.get("selected_signals", [])
         logger.info(f"Scout: Candidates before diversity filtering: {len(all_signals)}")
         
-        # Diversity Penalty: Reduce score for subsequent items from the same source
-        # Sort initially by raw score
-        ranked_signals = sorted(all_signals, key=lambda x: x.get("score", 0), reverse=True)
+        # Sort by raw score
+        ranked_signals = sorted(data.get("selected_signals", []), key=lambda x: x.get("score", 0), reverse=True)
         
-        diversity_adjusted_signals = []
-        seen_sources = {}
+        # Diversity-aware selection strategy
+        top_signals = []
+        selected_sources = {} # source_name: count
         
         for sig in ranked_signals:
+            if len(top_signals) >= 3:
+                break
+                
             source = sig.get("source", "unknown")
             raw_score = sig.get("score", 0)
             
-            # Diversity Penalty: Apply only if score > 70 (high impact threshold)
-            # Reduce penalty to 10% incremental
-            if raw_score > 70:
-                penalty = seen_sources.get(source, 0) * 0.10
-                adjusted_score = raw_score - (raw_score * penalty)
-            else:
-                adjusted_score = raw_score
-                
-            sig["adjusted_score"] = adjusted_score
-            diversity_adjusted_signals.append(sig)
-            seen_sources[source] = seen_sources.get(source, 0) + 1
+            # Condition 1: New source
+            # Condition 2: Repeated source only if it's significantly higher (>15 points) than the last added signal
+            #              or if we are desperate to fill slots (not reached 3 signals) and no other unique source left.
             
-        # Re-sort by adjusted score
-        final_ranked = sorted(diversity_adjusted_signals, key=lambda x: x.get("adjusted_score", 0), reverse=True)
-        top_signals = final_ranked[:3]
-        
-        represented_sources = {s.get("source") for s in top_signals}
-        logger.info(f"Scout: Final top {len(top_signals)} signals. Represented sources: {represented_sources}")
-        
+            is_new_source = source not in selected_sources
+            
+            # Logic: allow repeat if score is significantly better than any previously selected signal
+            # Or if it's the first time we see this source
+            if is_new_source:
+                top_signals.append(sig)
+                selected_sources[source] = selected_sources.get(source, 0) + 1
+                logger.info(f"Scout: Selected '{sig.get('title')}' from new source '{source}'")
+            else:
+                # Check if this signal is "significantly higher" (e.g., > 15 points) than the last selected signal
+                # to justify picking it over another unique source.
+                if len(top_signals) > 0 and raw_score > (top_signals[-1].get("score", 0) + 15):
+                    top_signals.append(sig)
+                    selected_sources[source] = selected_sources.get(source, 0) + 1
+                    logger.info(f"Scout: Selected duplicate source '{source}' for '{sig.get('title')}' due to significantly higher score.")
+                else:
+                    logger.info(f"Scout: Skipping '{sig.get('title')}' (source '{source}') to maintain diversity.")
+
+        # Final insertion logic using the adjusted strategy
         for signal in top_signals:
             insert_processed_signal(
                 title=signal["title"],
                 url=signal["source_url"],
-                score=signal["adjusted_score"],
+                score=signal["score"],
                 topic_fingerprint=signal["title"],
                 analysis_json=signal
             )
