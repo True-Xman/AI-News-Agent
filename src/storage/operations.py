@@ -15,8 +15,15 @@ def insert_raw_signal(signal: RawSignal, run_id: str):
     url_hash = hashlib.md5(signal.url.encode()).hexdigest()
     try:
         cursor.execute("""
-        INSERT OR IGNORE INTO raw_signals (url_hash, title, source, source_id, found_at, snippet, url, run_id)
+        INSERT INTO raw_signals (url_hash, title, source, source_id, found_at, snippet, url, run_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(url_hash) DO UPDATE SET 
+            run_id = excluded.run_id,
+            filter_decision = NULL,
+            filter_reason = NULL,
+            filter_confidence = NULL,
+            filter_scores = NULL,
+            filter_processed_at = NULL
         """, (url_hash, signal.title, signal.source, signal.source_id, signal.found_at, signal.snippet, signal.url, run_id))
         conn.commit()
     finally:
