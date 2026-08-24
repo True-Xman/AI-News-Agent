@@ -29,7 +29,8 @@ async def run_scout(run_id: str):
     
     for row in limited_rows:
         # row structure: url_hash(0), title(1), source(2), source_id(3), found_at(4), 
-        # snippet(5), ..., url(11)
+        # snippet(5), filter_decision(6), filter_reason(7), filter_confidence(8), 
+        # filter_scores(9), filter_processed_at(10), url(11), run_id(12)
         url_hash = row[0]
         original_url = row[11] if len(row) > 11 else f"https://news-scout.ai/signal/{url_hash}"
         
@@ -63,6 +64,7 @@ async def run_scout(run_id: str):
             if u_hash in hash_to_original:
                 sig["source_url"] = hash_to_original[u_hash]["source_url"]
                 # Keep the Gemini-detected org if it's better, but we have original source too
+                sig["source"] = hash_to_original[u_hash]["source"]
         logger.info(f"Scout: Candidates before diversity filtering: {len(all_signals)}")
         
         # Sort by raw score
