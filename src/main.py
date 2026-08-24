@@ -78,16 +78,16 @@ async def run_pipeline():
     else:
         logger.info("No candidate signals ready for Scout analysis.")
 
-    # 5. Generate Persian Report
-    top_rows = get_top_scored_signals(limit=5)
-    if not top_rows:
-        logger.warning("No scored signals available to generate report.")
-        return
+# Fix: Always check only the current run_id for unprocessed/scored signals
+    top_rows = get_top_scored_signals(limit=5, run_id=run_id)
 
+    # Diagnostic logging: report input
     formatted_signals = []
+    logger.info(f"Report input count: {len(top_rows)}")
     for row in top_rows:
-        # row[5] contains analysis_json string
+        # row structure from DB: id(0), title(1), url(2), score(3), fingerprint(4), analysis(5), reported_at(6), run_id(7)
         analysis_data = json.loads(row[5])
+        logger.info(f"Report input run_id: {row[7]}, url_hash: {analysis_data.get('url_hash', 'N/A')}")
         formatted_signals.append(analysis_data)
 
     report_text = format_persian_report(formatted_signals)

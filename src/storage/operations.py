@@ -86,10 +86,13 @@ def insert_processed_signal(title: str, url: str, score: float, topic_fingerprin
     conn.commit()
     conn.close()
 
-def get_top_scored_signals(limit=5):
+def get_top_scored_signals(limit=5, run_id=None):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM processed_signals ORDER BY score DESC LIMIT ?", (limit,))
+    if run_id:
+        cursor.execute("SELECT * FROM processed_signals WHERE run_id = ? ORDER BY score DESC LIMIT ?", (run_id, limit))
+    else:
+        cursor.execute("SELECT * FROM processed_signals ORDER BY score DESC LIMIT ?", (limit,))
     rows = cursor.fetchall()
     conn.close()
     return rows
