@@ -35,5 +35,14 @@ def get_organization(url: str, fallback: str) -> str:
             if key in fb_lower:
                 return name
                 
+    # 3. Last ditch effort: Try splitting by hyphen if fallback contains it
+    if fallback and "-" in fallback:
+        parts = fallback.split("-")
+        for part in parts:
+            p_lower = part.strip().lower()
+            for key, name in org_map.items():
+                if key == p_lower:
+                    return name
+                
     return fallback
 
