@@ -42,7 +42,7 @@ def format_persian_report(signals: List[Dict]) -> str:
         why_it_matters = signal.get('why_it_matters', '').strip()
         eli5 = signal.get('eli5', '').strip()
         x_angle = signal.get('x_angle', '').strip()
-        source_url = signal.get('source_url', '')
+        source_url = signal.get('source_url') or signal.get('url') or ''
 
         # Ensure what_happened is at most 3 lines
         lines = what_happened.split('\n')

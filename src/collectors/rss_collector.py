@@ -23,8 +23,8 @@ def collect_rss(source_item, run_id):
     for entry in feed.entries:
         try:
             signal = RawSignal(
-                url=entry.link,
-                title=entry.title,
+                url=entry.get("link", ""), # Added .get with fallback
+                title=entry.get("title", ""),
                 source=source_item.name,
                 source_id=source_item.priority,
                 found_at=time.mktime(entry.get("published_parsed", time.localtime())),
