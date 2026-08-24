@@ -76,10 +76,22 @@ async def run_scout(run_id: str):
             if len(top_signals) >= 3:
                 break
                 
-            source = get_organization(sig.get("source_url"), sig.get("source", "unknown"))
+            # Improved organization detection:
+            # 1. Use existing URL-based inference
+            # 2. Use source metadata directly if available
+            # 3. Fallback to extracting from title if necessary
+            raw_source = sig.get("source", "unknown")
+            source_url = sig.get("source_url")
+            
+            # Try to get organization more robustly
+            source = get_organization(source_url, raw_source)
+            if source == "unknown" and raw_source != "unknown":
+                # Attempt title-based inference
+                source = get_organization(None, sig.get("title", ""))
+            
             raw_score = sig.get("score", 0)
             
-            logger.info(f"Scout: Analyzing '{sig.get('title')}' - Detected Org: {source}")
+            logger.info(f"Scout: Analyzing '{sig.get('title')}' - Source: {raw_source}, Org: {source}")
             # Condition 1: New source
             # Condition 2: Repeated source only if it's significantly higher (>15 points) than the last added signal
             #              or if we are desperate to fill slots (not reached 3 signals) and no other unique source left.
