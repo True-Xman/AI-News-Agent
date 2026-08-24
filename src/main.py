@@ -87,7 +87,10 @@ async def run_pipeline():
     for row in top_rows:
         # row structure from DB: id(0), title(1), url(2), score(3), fingerprint(4), analysis(5), reported_at(6), run_id(7)
         analysis_data = json.loads(row[5])
-        logger.info(f"Report input run_id: {row[7]}, url_hash: {analysis_data.get('url_hash', 'N/A')}")
+        # Ensure source_url is populated from the db row url column if missing in analysis_json
+        if not analysis_data.get('source_url'):
+            analysis_data['source_url'] = row[2]
+        logger.info(f"Report input run_id: {row[7]}, url_hash: {analysis_data.get('url_hash', 'N/A')}, source_url: {analysis_data.get('source_url', 'N/A')}")
         formatted_signals.append(analysis_data)
 
     report_text = format_persian_report(formatted_signals)
