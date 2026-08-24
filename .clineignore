@@ -1,0 +1,9 @@
+.git/
+__pycache__/
+*.db
+*.sqlite
+venv/
+.env
+tests/
+test_*.py
+run_pipeline_test.py
