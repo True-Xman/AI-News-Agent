@@ -1,86 +1,82 @@
-"""
-Tests for the Persian report formatter.
-"""
-
-import sys
-import os
 import unittest
+from datetime import datetime, timezone
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.reporting.formatter import format_persian_report, escape_markdown_v2
+from src.errors import ResponseValidationError
+from src.reporting.formatter import format_report, strip_telegram_html, validate_report
 
 
-class TestPersianReportFormatter(unittest.TestCase):
+SAMPLE_SIGNAL = {
+    "title": "Verified capability update",
+    "score": 84.5,
+    "what_happened": "The source announced a measured capability change.",
+    "why_it_matters": "The change affects practical agent workflows.",
+    "plain_english_explanation": "The tool can now complete a useful task more reliably.",
+    "x_discussion_angle": "Discuss the measured impact and remaining limits.",
+    "source_url": "https://example.com/verified-update",
+}
 
-    def test_formatter_output_starts_with_header(self):
-        """Test that the formatted report starts with the correct header."""
+
+class EnglishReportFormatterTests(unittest.TestCase):
+    def test_report_uses_compact_english_screenshot_layout(self):
+        report = format_report(
+            [SAMPLE_SIGNAL],
+            generated_at=datetime(2026, 9, 13, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(
+            strip_telegram_html(report).splitlines(),
+            [
+                "AI SIGNAL SCOUT",
+                "AUTONOMOUS AI INTELLIGENCE BRIEF",
+                "2026-09-13 UTC · TOP 1",
+                "1 · 84.5/100 · Verified capability update",
+                "Why: The change affects practical agent workflows. · Source ↗",
+                "Live RSS → Gemini analysis → deterministic ranking → Telegram",
+            ],
+        )
+        self.assertIn("<b>AI SIGNAL SCOUT</b>", report)
+        self.assertIn(
+            "<b>1 · 84.5/100 · Verified capability update</b>",
+            report,
+        )
+        self.assertIn(
+            '<a href="https://example.com/verified-update">Source ↗</a>',
+            report,
+        )
+
+    def test_report_stays_within_one_frame_budget(self):
         signals = [
             {
-                "title": "Test Signal",
-                "score": 85.0,
-                "what_happened": "Test what happened",
-                "why_it_matters": "Test why matters",
-                "eli5": "Test explanation",
-                "x_angle": "Test x angle",
-                "source_url": "https://example.com"
+                **SAMPLE_SIGNAL,
+                "title": "Long title " * 30,
+                "why_it_matters": "Long reason " * 40,
+                "source_url": f"https://example.com/{index}",
             }
+            for index in range(5)
         ]
-        result = format_persian_report(signals)
-        self.assertTrue(result.startswith("🤖 AI Signal Scout\nگزارش هوش مصنوعی روزانه\n"))
 
-    def test_formatter_empty_signals(self):
-        """Test that formatting empty signals returns an empty report message."""
-        result = format_persian_report([])
-        self.assertEqual(result, "")
+        report = format_report(signals)
+        visible = strip_telegram_html(report)
 
-    def test_formatter_missing_fields(self):
-        """Test that missing fields are handled gracefully."""
-        # Signal with some missing fields
-        signals = [
-            {
-                "title": "Incomplete Signal",
-                "score": None,  # Missing score
-                # Missing what_happened
-                "why_it_matters": "Important update",
-                "eli5": "Simple explanation",
-                "x_angle": "Discussion potential high",
-                "source_url": ""
-            }
-        ]
-        result = format_persian_report(signals)
-        # Should not crash and should contain the title
-        self.assertIn("Incomplete Signal", result)
+        self.assertLessEqual(len(visible), 1_000)
+        self.assertLessEqual(len(visible.splitlines()), 15)
 
-    def test_formatter_limits_what_happened_to_3_lines(self):
-        """Test that what_happened is limited to 3 lines."""
-        signals = [
-            {
-                "title": "Test",
-                "score": 50.0,
-                "what_happened": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5",
-                "why_it_matters": "Reason",
-                "eli5": "Explanation",
-                "x_angle": "X angle",
-                "source_url": "http://test.com"
-            }
-        ]
-        result = format_persian_report(signals)
-        # Should contain Line 1, Line 2, Line 3 but NOT Line 4 or Line 5
-        self.assertIn("Line 1", result)
-        self.assertIn("Line 2", result)
-        self.assertIn("Line 3", result)
-        # Verify truncation happened by checking that Line 4 is NOT in the result
-        self.assertNotIn("Line 4", result)
-        self.assertNotIn("Line 5", result)
+    def test_report_rejects_arabic_script(self):
+        with self.assertRaisesRegex(ResponseValidationError, "Arabic-script"):
+            validate_report("گزارش", item_count=1)
 
-    def test_markdown_escaping(self):
-        """Test that special markdown characters are escaped."""
-        text = "Test with *asterisk* and _underscore_"
-        escaped = escape_markdown_v2(text)
-        self.assertIn(r'\*', escaped)
-        self.assertIn(r'\_', escaped)
+    def test_report_escapes_dynamic_html(self):
+        signal = {**SAMPLE_SIGNAL, "title": "R&D <verified>"}
+
+        report = format_report([signal])
+
+        self.assertIn("R&amp;D &lt;verified&gt;", report)
+
+    def test_report_rejects_non_https_source(self):
+        signal = {**SAMPLE_SIGNAL, "source_url": "http://example.com/item"}
+
+        with self.assertRaisesRegex(ResponseValidationError, "HTTPS"):
+            format_report([signal])
 
 
 if __name__ == "__main__":

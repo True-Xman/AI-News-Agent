@@ -1,91 +1,131 @@
-"""
-Report Formatter for AI Signal Scout.
-Formats the top 5 signals into a Persian intelligence report.
-"""
+"""Compact, English-only Telegram report formatting."""
 
-from typing import List, Dict
 import html
+import re
+from datetime import datetime, timezone
+from urllib.parse import urlparse
+
+from ..errors import ResponseValidationError
 
 
-def format_persian_report(signals: List[Dict]) -> str:
-    """
-    Format a list of signals into a Persian report.
+REPORT_LIMIT = 5
+MAX_TITLE_CHARS = 60
+MAX_REASON_CHARS = 72
+MAX_REPORT_VISIBLE_CHARS = 1_000
+MAX_REPORT_LINES = 15
+PROVENANCE_LINE = "Live RSS → Gemini analysis → deterministic ranking → Telegram"
+ARABIC_SCRIPT_PATTERN = re.compile(r"[\u0600-\u06ff]")
+HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
+SOURCE_LINK_PATTERN = re.compile(r'<a href="([^"]+)">Source ↗</a>')
 
-    Args:
-        signals: List of signal dictionaries with keys:
-            - title: str
-            - score: float
-            - what_happened: str (max 3 lines)
-            - why_it_matters: str
-            - eli5: str
-            - x_angle: str
-            - source_url: str
 
-    Returns:
-        Formatted Persian report string.
-    """
+def contains_arabic_script(text: str) -> bool:
+    return bool(ARABIC_SCRIPT_PATTERN.search(text))
+
+
+def strip_telegram_html(report: str) -> str:
+    """Return the visible text represented by the formatter's small HTML subset."""
+    return html.unescape(HTML_TAG_PATTERN.sub("", report))
+
+
+def _ellipsize(value, limit: int, fallback: str) -> str:
+    text = " ".join(str(value or fallback).split())
+    if len(text) <= limit:
+        return text
+    prefix = text[: limit - 1].rstrip()
+    if " " in prefix:
+        prefix = prefix.rsplit(" ", 1)[0]
+    return f"{prefix}…"
+
+
+def _validate_https_url(value) -> str:
+    url = str(value or "").strip()
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ResponseValidationError("Every report item requires an HTTPS source URL")
+    return url
+
+
+def validate_report(report: str, item_count: int) -> None:
+    """Validate the one-frame English report boundary before delivery."""
+    if contains_arabic_script(report):
+        raise ResponseValidationError("Report contains Arabic-script characters")
+    if not 1 <= item_count <= REPORT_LIMIT:
+        raise ResponseValidationError("Report item count must be between 1 and 5")
+
+    visible = strip_telegram_html(report)
+    lines = visible.splitlines()
+    if len(visible) > MAX_REPORT_VISIBLE_CHARS or len(lines) > MAX_REPORT_LINES:
+        raise ResponseValidationError("Report exceeds the one-frame screenshot budget")
+    if len(lines) != 4 + (2 * item_count):
+        raise ResponseValidationError("Report does not match the compact item structure")
+    if lines[:2] != ["AI SIGNAL SCOUT", "AUTONOMOUS AI INTELLIGENCE BRIEF"]:
+        raise ResponseValidationError("Report header is invalid")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2} UTC · TOP \d", lines[2]):
+        raise ResponseValidationError("Report date and count header is invalid")
+    if lines[2].rsplit(" ", 1)[-1] != str(item_count):
+        raise ResponseValidationError("Report header count does not match report items")
+    if lines[-1] != PROVENANCE_LINE:
+        raise ResponseValidationError("Report provenance line is invalid")
+
+    links = SOURCE_LINK_PATTERN.findall(report)
+    if len(links) != item_count:
+        raise ResponseValidationError("Report must contain one source link per item")
+    for escaped_url in links:
+        _validate_https_url(html.unescape(escaped_url))
+
+
+def format_report(
+    signals: list[dict],
+    generated_at: datetime | None = None,
+) -> str:
+    """Format up to five current-run signals as one screenshot-ready card."""
     if not signals:
         return ""
+    if len(signals) > REPORT_LIMIT:
+        raise ResponseValidationError("Report item count must be between 1 and 5")
 
-    header = "🤖 AI Signal Scout\nگزارش هوش مصنوعی روزانه\n"
-    report_parts = [header]
+    timestamp = generated_at or datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    date_text = timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d UTC")
 
-    for i, signal in enumerate(signals, 1):
-        # Escape special characters for Telegram MarkdownV2 if needed, but we'll use plain text for now
-        # For simplicity, we are not using Markdown in this version, but we can add it later.
-        title = signal.get('title', 'بدون عنوان')
-        score = signal.get('score', 0)
-        # Handle None score
-        if score is None:
-            score = 0
-        what_happened = signal.get('what_happened', '').strip()
-        why_it_matters = signal.get('why_it_matters', '').strip()
-        eli5 = signal.get('eli5', '').strip()
-        x_angle = signal.get('x_angle', '').strip()
-        source_url = signal.get('source_url', '')
-
-        # Ensure what_happened is at most 3 lines
-        lines = what_happened.split('\n')
-        if len(lines) > 3:
-            what_happened = '\n'.join(lines[:3]) + '...'
-
-        signal_section = (
-            f"\n{i}. {title}\n"
-            f"امتیاز: {score:.1f}\n"
-            f"چه اتفاقی افتاد: {what_happened}\n"
-            f"چرا مهم است: {why_it_matters}\n"
-            f"ELI5: {eli5}\n"
-            f"چرا برای X مهم است: {x_angle}\n"
-            f"منبع: {source_url}\n"
-        )
-        report_parts.append(signal_section)
-
-    return ''.join(report_parts)
-
-
-def escape_markdown_v2(text: str) -> str:
-    """
-    Escape Telegram MarkdownV2 special characters.
-    See: https://core.telegram.org/bots/api#formatting-options
-    """
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return ''.join(f'\\{char}' if char in escape_chars else char for char in text)
-
-
-if __name__ == "__main__":
-    # Example usage
-    test_signals = [
-        {
-            "title": "O1-Mini Released",
-            "score": 92.5,
-            "what_happened": "OpenAI released O1-Mini, a smaller version of their reasoning model.\n"
-                           "It is optimized for mobile devices and has lower latency.\n"
-                           "The model is available via API.",
-            "why_it_matters": "This makes advanced reasoning models accessible on edge devices,\n"
-                              "potentially enabling new applications in robotics and IoT.",
-            "eli5": "Imagine a smart brain that can fit in your phone and help you solve hard problems.",
-            "x_angle": "This could spark discussions about the future of mobile AI and privacy.",
-            "source_url": "https://openai.com/o1-mini"
-        }
+    lines = [
+        "<b>AI SIGNAL SCOUT</b>",
+        "AUTONOMOUS AI INTELLIGENCE BRIEF",
+        f"{date_text} · TOP {len(signals)}",
     ]
-    print(format_persian_report(test_signals))
+    for position, signal in enumerate(signals, 1):
+        title = html.escape(
+            _ellipsize(signal.get("title"), MAX_TITLE_CHARS, "Untitled signal"),
+            quote=True,
+        )
+        reason = html.escape(
+            _ellipsize(
+                signal.get("why_it_matters"),
+                MAX_REASON_CHARS,
+                "Details were not provided.",
+            ),
+            quote=True,
+        )
+        try:
+            score = float(signal.get("score", 0) or 0)
+        except (TypeError, ValueError) as exc:
+            raise ResponseValidationError("Report score must be numeric") from exc
+        if not 0 <= score <= 100:
+            raise ResponseValidationError("Report score must be between 0 and 100")
+        source_url = html.escape(
+            _validate_https_url(signal.get("source_url")),
+            quote=True,
+        )
+        lines.extend(
+            [
+                f"<b>{position} · {score:.1f}/100 · {title}</b>",
+                f'Why: {reason} · <a href="{source_url}">Source ↗</a>',
+            ]
+        )
+    lines.append(PROVENANCE_LINE)
+
+    report = "\n".join(lines)
+    validate_report(report, item_count=len(signals))
+    return report

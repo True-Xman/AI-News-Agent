@@ -18,7 +18,7 @@ from src.storage.operations import (
 )
 from src.intelligence.sieve import run_sieve
 from src.intelligence.scout import run_scout
-from src.reporting.formatter import format_persian_report
+from src.reporting.formatter import format_report
 from src.reporting.telegram import TelegramClient
 import json
 
@@ -78,8 +78,8 @@ async def run_pipeline():
     else:
         logger.info("No candidate signals ready for Scout analysis.")
 
-    # 5. Generate Persian Report
-    top_rows = get_top_scored_signals(limit=5)
+    # 5. Generate the English report for this run.
+    top_rows = get_top_scored_signals(run_id, limit=5)
     if not top_rows:
         logger.warning("No scored signals available to generate report.")
         return
@@ -90,8 +90,8 @@ async def run_pipeline():
         analysis_data = json.loads(row[5])
         formatted_signals.append(analysis_data)
 
-    report_text = format_persian_report(formatted_signals)
-    logger.info(f"Generated Persian report ({len(report_text)} chars).")
+    report_text = format_report(formatted_signals)
+    logger.info(f"Generated English report ({len(report_text)} chars).")
 
     # 6. Deliver to Telegram
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")

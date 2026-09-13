@@ -17,7 +17,7 @@ class TestMainPipeline(unittest.TestCase):
             from src.storage.operations import get_unprocessed_raw_signals, get_top_scored_signals
             from src.intelligence.sieve import run_sieve
             from src.intelligence.scout import run_scout
-            from src.reporting.formatter import format_persian_report
+            from src.reporting.formatter import format_report
             from src.reporting.telegram import TelegramClient
             import src.main
 
@@ -25,9 +25,10 @@ class TestMainPipeline(unittest.TestCase):
         """Verify TelegramClient raises clear error when environment variables are missing."""
         os.environ.pop("TELEGRAM_BOT_TOKEN", None)
         os.environ.pop("TELEGRAM_CHANNEL_ID", None)
-        
+
+        from src.errors import ConfigurationError
         from src.reporting.telegram import TelegramClient
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ConfigurationError):
             TelegramClient()
 
 if __name__ == "__main__":
