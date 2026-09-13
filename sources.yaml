@@ -1,62 +1,55 @@
-# AI Signal Scout Source Configuration
-# Externalized source definitions for the AI News Agent
-
+# Audited RSS and Atom sources for AI Signal Scout.
 sources:
-  # Official AI Lab Announcements
-  - name: OpenAI Blog
-    url: https://openai.com/news/rss
+  - name: OpenAI News
+    url: https://openai.com/news/rss.xml
     type: rss
     priority: 1
     category: official
 
-  - name: Anthropic Blog
-    url: https://www.anthropic.com/feed.xml
+  - name: Google DeepMind Blog
+    url: https://deepmind.google/blog/rss.xml
     type: rss
     priority: 2
     category: official
 
-  - name: DeepMind Blog
-    url: https://deepmind.google/blog/feed/
+  - name: Hugging Face Blog
+    url: https://huggingface.co/blog/feed.xml
     type: rss
     priority: 3
     category: official
 
-  # Research Sources
   - name: arXiv cs.AI
-    url: http://export.arxiv.org/rss/cs.AI
+    url: https://export.arxiv.org/rss/cs.AI
     type: rss
     priority: 4
     category: research
 
   - name: arXiv cs.CL
-    url: http://export.arxiv.org/rss/cs.CL
+    url: https://export.arxiv.org/rss/cs.CL
     type: rss
     priority: 5
     category: research
 
-  # Industry News
-  - name: TechCrunch AI RSS
+  - name: TechCrunch AI
     url: https://techcrunch.com/category/artificial-intelligence/feed/
     type: rss
     priority: 6
     category: industry
 
-  - name: The Verge AI RSS
-    url: https://www.theverge.com/ai-artificial-intelligence/rss/index.xml
+  - name: The Verge AI
+    url: https://www.theverge.com/rss/ai-artificial-intelligence/index.xml
     type: rss
     priority: 7
     category: industry
 
-  # Agent Ecosystem
-  - name: LangGraph Blog
-    url: https://blog.langchain.dev/rss
+  - name: LangGraph Releases
+    url: https://github.com/langchain-ai/langgraph/releases.atom
     type: rss
     priority: 8
     category: agents
 
-  # Security & Risks
   - name: OWASP GenAI
-    url: https://owasp.org/feed.xml
+    url: https://genai.owasp.org/feed/
     type: rss
     priority: 9
     category: security

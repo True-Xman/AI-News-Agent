@@ -15,17 +15,22 @@ def get_organization(url: str, fallback: str) -> str:
         "techcrunch": "TechCrunch",
         "theverge": "The Verge",
         "langchain": "LangChain",
-        "owasp": "OWASP"
+        "langgraph": "LangGraph",
+        "huggingface": "Hugging Face",
+        "owasp": "OWASP",
     }
 
     # 1. URL/domain matching
     if url:
         try:
-            domain = urlparse(url).netloc.lower()
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower()
+            if domain == "github.com" and "/langchain-ai/langgraph" in parsed.path.lower():
+                return "LangGraph"
             for key, name in org_map.items():
                 if key in domain:
                     return name
-        except:
+        except (TypeError, ValueError):
             pass
     
     # 2. Check fallback strings for patterns

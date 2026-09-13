@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>AI Signal Scout Fixture</title>
+    <link>https://feed.test/</link>
+    <description>Deterministic RSS entries for collector tests.</description>
+    <item>
+      <title>Current capability update</title>
+      <link>https://feed.test/current</link>
+      <description>A current, evidence-backed update.</description>
+      <pubDate>Sun, 13 Sep 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Undated official update</title>
+      <link>https://feed.test/undated</link>
+      <description>An official item without a publication date.</description>
+    </item>
+    <item>
+      <title>Old update</title>
+      <link>https://feed.test/old</link>
+      <description>This item is outside the seven-day window.</description>
+      <pubDate>Sat, 05 Sep 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Future update</title>
+      <link>https://feed.test/future</link>
+      <description>This item is beyond the allowed future skew.</description>
+      <pubDate>Tue, 15 Sep 2026 13:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
