@@ -174,20 +174,26 @@ When there are no new reportable signals, the run succeeds with status `no_new_r
 
 ## English Output Contract
 
-English is the only production output language in this hardening. The formatter is named `format_report`; the report uses these labels:
+English is the only production output language in this hardening. The formatter is named `format_report`. It produces one compact Telegram summary card designed to serve as LinkedIn-ready proof of the agent's work and to fit in a single standard desktop Telegram conversation screenshot without scrolling. Because viewport size and font scaling vary, the deterministic contract is a maximum of 15 logical lines and 1,000 visible characters, not a claim about every possible device.
 
-- `Score`
-- `What happened`
-- `Why it matters`
-- `Plain-English explanation`
-- `X discussion angle`
-- `Source`
+The rendered Telegram card uses HTML-safe formatting so source URLs can appear as a clean `Source ↗` link instead of a long visible URL. Its exact visible structure is:
+
+```text
+AI SIGNAL SCOUT
+AUTONOMOUS AI INTELLIGENCE BRIEF
+2026-09-13 UTC · TOP 5
+1 · 84.5/100 · Verified capability update
+Why: The change affects practical agent workflows. · Source ↗
+Live RSS → Gemini analysis → deterministic ranking → Telegram
+```
+
+Each additional signal repeats only the two item lines without spacer or separator lines. The count in `TOP N` reflects the actual number of current-run items. Titles are capped at 60 visible characters and the `Why` sentence at 96 visible characters, with word-boundary ellipsizing. Scores use one decimal place. `Source ↗` is a clickable link to the original HTTPS URL. The final provenance line makes the automated path visible in the screenshot without exposing implementation secrets or overstating the role of Gemini: collection and analysis are live, while score aggregation and ranking are deterministic Python behavior. The full `what_happened`, `why_it_matters`, `plain_english_explanation`, and `x_discussion_angle` values remain in SQLite for auditability; only the concise decision-useful view is delivered.
 
 Prompts explicitly require English values even when an input title or snippet contains another language. Missing-field fallbacks are English and visible; missing required Scout fields normally fail validation rather than being silently filled.
 
-Before delivery, the report validator checks required sections, nonempty report items, item count at or below five, and the absence of Arabic-script Unicode characters. This is a deterministic guard against the known Persian-output regression. It does not claim to perform general natural-language detection.
+Before delivery, the report validator checks the exact header, item, and provenance structure, nonempty report items, item count at or below five, the 15-line and 1,000-visible-character limits, valid HTTPS source links, and the absence of Arabic-script Unicode characters. This is a deterministic guard against the known Persian-output regression. It does not claim to perform general natural-language detection.
 
-Telegram continues to receive plain text. Message chunking stays below Telegram’s 4,096-character limit. Delivery logs do not print tokens, channel IDs, report text, or Telegram message IDs.
+Telegram receives one HTML-formatted message with escaped dynamic text and a clickable source link for every item. The compact-card limit intentionally stays far below Telegram’s 4,096-character limit; a report that exceeds the one-frame contract fails validation rather than being split into multiple messages. Delivery logs do not print tokens, channel IDs, report text, source URLs, or Telegram message IDs.
 
 ## Failure Semantics
 
@@ -332,4 +338,3 @@ The hardening is ready for merge review only when evidence shows:
 - no secrets or private information are added;
 - a sanitized evidence artifact exists for each verification run;
 - the portfolio evidence bundle distinguishes safe, qualified, and unsupported claims.
-

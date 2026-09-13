@@ -577,15 +577,16 @@ git commit -m "feat: rank Scout results deterministically"
 
 **Interfaces:**
 - Consumes: a list of validated Scout analysis dictionaries.
-- Produces: `format_report(signals) -> str`, `validate_report(report, item_count) -> None`, `contains_arabic_script(text) -> bool`, and `TelegramClient.send_message(text, client=None) -> bool`.
+- Produces: `format_report(signals, generated_at=None) -> str`, `validate_report(report, item_count) -> None`, `contains_arabic_script(text) -> bool`, and `TelegramClient.send_message(text, client=None) -> bool`.
 
 - [ ] **Step 1: Replace Persian formatter tests with failing English contract tests**
 
 ```python
 import unittest
+from datetime import datetime, timezone
 
 from src.errors import ResponseValidationError
-from src.reporting.formatter import format_report, validate_report
+from src.reporting.formatter import format_report, strip_telegram_html, validate_report
 
 
 SAMPLE_SIGNAL = {
@@ -600,22 +601,36 @@ SAMPLE_SIGNAL = {
 
 
 class EnglishReportFormatterTests(unittest.TestCase):
-    def test_report_uses_english_header_and_labels(self):
-        report = format_report([SAMPLE_SIGNAL])
-        self.assertTrue(report.startswith("AI Signal Scout\nDaily AI intelligence brief — 1 signal\n"))
-        for label in ("Score:", "What happened:", "Why it matters:", "Plain-English explanation:", "X discussion angle:", "Source:"):
-            self.assertIn(label, report)
+    def test_report_uses_compact_english_screenshot_layout(self):
+        report = format_report(
+            [SAMPLE_SIGNAL],
+            generated_at=datetime(2026, 9, 13, tzinfo=timezone.utc),
+        )
+        self.assertIn("<b>AI SIGNAL SCOUT</b>", report)
+        self.assertIn("AUTONOMOUS AI INTELLIGENCE BRIEF", report)
+        self.assertIn("2026-09-13 UTC · TOP 1", report)
+        self.assertIn("<b>1 · 84.5/100 · Verified capability update</b>", report)
+        self.assertIn('Why: The change affects practical agent workflows. · <a href="https://example.com/verified-update">Source ↗</a>', report)
+        self.assertIn("Live RSS → Gemini analysis → deterministic ranking → Telegram", report)
+
+    def test_report_stays_within_one_frame_budget(self):
+        signals = [{**SAMPLE_SIGNAL, "title": "T" * 200, "why_it_matters": "W" * 300} for _ in range(5)]
+        report = format_report(signals)
+        visible = strip_telegram_html(report)
+        self.assertLessEqual(len(visible), 1_000)
+        self.assertLessEqual(len(visible.splitlines()), 15)
 
     def test_report_rejects_arabic_script(self):
         with self.assertRaisesRegex(ResponseValidationError, "Arabic-script"):
             validate_report("گزارش", item_count=1)
 
-    def test_report_limits_what_happened_to_three_lines(self):
-        signal = {**SAMPLE_SIGNAL, "what_happened": "1\n2\n3\n4"}
-        self.assertNotIn("\n4\n", format_report([signal]))
+    def test_report_escapes_dynamic_html(self):
+        signal = {**SAMPLE_SIGNAL, "title": "R&D <verified>"}
+        report = format_report([signal])
+        self.assertIn("R&amp;D &lt;verified&gt;", report)
 ```
 
-In `test_telegram.py`, use `httpx.MockTransport` to assert chunk lengths never exceed 4,096, a Telegram `{ "ok": false }` response returns `False`, and logs do not contain the configured channel or returned message ID.
+Import `strip_telegram_html` from the formatter in this test. In `test_telegram.py`, use `httpx.MockTransport` to assert one message is sent with `parse_mode="HTML"`, a Telegram `{ "ok": false }` response returns `False`, and logs do not contain the configured channel, source URL, report text, or returned message ID.
 
 - [ ] **Step 2: Run report and Telegram tests and confirm RED**
 
@@ -625,11 +640,13 @@ Run:
 .\.venv\Scripts\python.exe -m unittest tests.test_formatter tests.test_telegram -v
 ```
 
-Expected: `format_report`, the English fields, report validation, and injectable HTTP client are absent.
+Expected: `format_report`, the compact screenshot budget, English report validation, HTML-safe delivery, and injectable HTTP client are absent.
 
 - [ ] **Step 3: Implement the English formatter and privacy-safe sender**
 
-Use singular/plural headers based on item count. Use `Untitled signal`, `Not provided`, and `Source unavailable` as explicit English fallbacks. Format scores with one decimal. Preserve plain-text delivery.
+Generate exactly one compact HTML-safe Telegram card. Use `AI SIGNAL SCOUT`, `AUTONOMOUS AI INTELLIGENCE BRIEF`, and `YYYY-MM-DD UTC · TOP N` as the three header lines. Render each signal as exactly two logical lines without blank separators: `<position> · <score>/100 · <title>` and `Why: <concise sentence> · Source ↗`, with `Source ↗` linked to the original URL. Cap titles at 60 visible characters and reasons at 96 visible characters with word-boundary ellipsizing. Escape all dynamic HTML and accept only HTTPS source URLs. End with the exact visible provenance line `Live RSS → Gemini analysis → deterministic ranking → Telegram`. The full Scout analysis remains stored but is intentionally omitted from the screenshot card.
+
+Set `MAX_REPORT_VISIBLE_CHARS = 1_000` and `MAX_REPORT_LINES = 15`. `generated_at` defaults to the current UTC time but is injectable for deterministic tests. Reject over-budget reports instead of splitting them; the one-message boundary is part of the portfolio evidence.
 
 ```python
 ARABIC_SCRIPT_PATTERN = re.compile(r"[\u0600-\u06ff]")
@@ -642,11 +659,14 @@ def contains_arabic_script(text: str) -> bool:
 def validate_report(report: str, item_count: int) -> None:
     if not 1 <= item_count <= 5:
         raise ResponseValidationError("Report item count must be between 1 and 5")
+    visible = strip_telegram_html(report)
+    if len(visible) > MAX_REPORT_VISIBLE_CHARS or len(visible.splitlines()) > MAX_REPORT_LINES:
+        raise ResponseValidationError("Report exceeds the one-frame screenshot budget")
     if contains_arabic_script(report):
         raise ResponseValidationError("Report contains Arabic-script characters")
 ```
 
-Allow `TelegramClient.send_message` to receive an existing `httpx.Client` for tests. Log chunk count and success only; remove message ID logging and Persian-specific comments.
+Allow `TelegramClient.send_message` to receive an existing `httpx.Client` for tests. Send exactly one message with `parse_mode="HTML"` and disabled link previews. Log success only; remove chunking, message-ID logging, and Persian-specific comments.
 
 - [ ] **Step 4: Verify the report boundary**
 
