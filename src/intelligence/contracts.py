@@ -81,3 +81,53 @@ class SieveResult:
     evaluated: int
     kept: int
     discarded: int
+
+
+class ScoreBreakdown(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability_shift: float = Field(ge=0, le=100)
+    real_world_impact: float = Field(ge=0, le=100)
+    agent_relevance: float = Field(ge=0, le=100)
+    x_discussion_potential: float = Field(ge=0, le=100)
+    novelty: float = Field(ge=0, le=100)
+    source_quality: float = Field(ge=0, le=100)
+
+
+class ScoutAnalysis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url_hash: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    what_happened: str = Field(min_length=1)
+    why_it_matters: str = Field(min_length=1)
+    plain_english_explanation: str = Field(min_length=1)
+    x_discussion_angle: str = Field(min_length=1)
+    score_breakdown: ScoreBreakdown
+    source_url: str | None = None
+
+    @field_validator(
+        "title",
+        "what_happened",
+        "why_it_matters",
+        "plain_english_explanation",
+        "x_discussion_angle",
+    )
+    @classmethod
+    def text_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Scout text fields must not be blank")
+        return value.strip()
+
+
+def validate_scout_analyses(value: list) -> list[ScoutAnalysis]:
+    try:
+        return [ScoutAnalysis.model_validate(item) for item in value]
+    except (ValidationError, TypeError) as exc:
+        raise ResponseValidationError("Scout response violated its JSON contract") from exc
+
+
+@dataclass(frozen=True)
+class ScoutResult:
+    analyzed: int
+    selected: int

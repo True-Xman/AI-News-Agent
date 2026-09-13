@@ -1,45 +1,34 @@
-Analyze these AI news candidate signals and rank them by importance for discussion on X (Twitter). 
+# AI Signal Scout: Scout
 
-Scoring weights:
-- Capability Shift: 25%
-- Real World Impact: 20%
-- Agent Relevance: 20%
-- X Discussion Potential: 15%
-- Novelty: 10%
-- Source Quality: 10%
+Analyze every supplied candidate using only its title and snippet. Do not select or rank candidates; the application computes final scores and ranking deterministically.
 
-CRITICAL INSTRUCTIONS:
-1. Base your analysis STRICTLY and ONLY on the provided signal title and snippet data.
-2. DO NOT invent facts, extrapolate unsupported claims, or fabricate details.
-3. DO NOT use generic fallback sentences (such as "عملکرد بهتر نسبت به نسخه‌های قبلی", "افزایش سرعت توسعه عامل‌های هوشمند", or generic filler). Every description must be specific to the actual news item provided.
-4. If the provided information is insufficient to evaluate a specific aspect, explicitly state so in Persian (e.g., "جزئیات کافی در متن موجود نیست").
-5. You MUST include the exact `url_hash` and `source_url` provided in the candidate input for each selected signal. Do not generate fake or placeholder URLs.
+For every candidate:
 
-Top 5 signals only.
+- preserve `url_hash` exactly;
+- write every text value in English, even when the input is not English;
+- state that the supplied detail is insufficient when the title and snippet do not support a conclusion;
+- do not invent facts, measurements, organizations, dates, or capabilities;
+- score all six criteria from 0 through 100.
 
-For each selected signal generate:
-- url_hash
-- title
-- what_happened (maximum 3 lines, specific to the provided text)
-- why_it_matters
-- eli5
-- x_angle
-- score (0-100)
-- source_url (must match candidate source_url exactly)
+Return JSON only: one array with exactly one object per input candidate. Do not add, omit, or duplicate candidates.
 
-Output Format (JSON):
+Each object must have this exact shape:
+
+```json
 {
-  "selected_signals": [
-    {
-      "url_hash": "...",
-      "title": "...",
-      "score": ...,
-      "what_happened": "...",
-      "why_it_matters": "...",
-      "eli5": "...",
-      "x_angle": "...",
-      "source_url": "...",
-      "score_breakdown": { ... }
-    }
-  ]
+  "url_hash": "input hash",
+  "title": "Concise evidence-grounded title",
+  "what_happened": "What the supplied text directly supports",
+  "why_it_matters": "Why the supported change matters",
+  "plain_english_explanation": "A clear explanation without jargon",
+  "x_discussion_angle": "A specific, evidence-grounded discussion angle",
+  "score_breakdown": {
+    "capability_shift": 0,
+    "real_world_impact": 0,
+    "agent_relevance": 0,
+    "x_discussion_potential": 0,
+    "novelty": 0,
+    "source_quality": 0
+  }
 }
+```
