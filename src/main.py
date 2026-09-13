@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 from .errors import PipelineError
 from .pipeline import run_pipeline
 
-
 logger = logging.getLogger("AI-Signal-Scout")
 
 
@@ -62,7 +61,7 @@ def cli(argv: list[str] | None = None) -> int:
     except PipelineError as exc:
         logger.error("Pipeline failed: %s", type(exc).__name__)
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - sanitize failures at the CLI boundary
         logger.error("Unexpected pipeline failure: %s", type(exc).__name__)
         return 1
 

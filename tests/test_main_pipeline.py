@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import tempfile
@@ -11,7 +12,6 @@ from src.errors import ConfigurationError, ExternalServiceError, ResponseValidat
 from src.intelligence.contracts import ScoutResult, SieveResult
 from src.pipeline import PipelineDependencies, run_pipeline
 from src.reporting.telegram import TelegramClient
-
 
 VALID_SIGNAL = {
     "title": "Verified signal",
@@ -94,7 +94,9 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
                 await run_pipeline(
                     deliver_report=True,
                     summary_path=path,
-                    dependencies=make_dependencies([VALID_SIGNAL], telegram_result=False),
+                    dependencies=make_dependencies(
+                        [VALID_SIGNAL], telegram_result=False
+                    ),
                 )
 
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -106,7 +108,9 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ExternalServiceError):
             await run_pipeline(
                 deliver_report=False,
-                dependencies=make_dependencies(source_results=[True, True, False, False]),
+                dependencies=make_dependencies(
+                    source_results=[True, True, False, False]
+                ),
             )
 
     async def test_model_validation_error_propagates(self):
@@ -140,12 +144,15 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
 class ImportAndConfigurationTests(unittest.TestCase):
     def test_main_imports_without_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
-            import src.main
+            module = importlib.import_module("src.main")
+            importlib.reload(module)
 
     def test_telegram_configuration_error_is_explicit(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ConfigurationError):
-                TelegramClient()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            self.assertRaises(ConfigurationError),
+        ):
+            TelegramClient()
 
 
 if __name__ == "__main__":

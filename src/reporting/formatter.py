@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 
 from ..errors import ResponseValidationError
 
-
 REPORT_LIMIT = 5
 MAX_TITLE_CHARS = 60
 MAX_REASON_CHARS = 72
@@ -58,7 +57,9 @@ def validate_report(report: str, item_count: int) -> None:
     if len(visible) > MAX_REPORT_VISIBLE_CHARS or len(lines) > MAX_REPORT_LINES:
         raise ResponseValidationError("Report exceeds the one-frame screenshot budget")
     if len(lines) != 4 + (2 * item_count):
-        raise ResponseValidationError("Report does not match the compact item structure")
+        raise ResponseValidationError(
+            "Report does not match the compact item structure"
+        )
     if lines[:2] != ["AI SIGNAL SCOUT", "AUTONOMOUS AI INTELLIGENCE BRIEF"]:
         raise ResponseValidationError("Report header is invalid")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2} UTC · TOP \d", lines[2]):

@@ -126,7 +126,10 @@ class ScoutPipelineTests(TemporaryDatabaseTestCase):
 
         async def complete_response(prompt):
             return json.dumps(
-                [self._analysis(url_hash, index) for index, url_hash in enumerate(hashes)]
+                [
+                    self._analysis(url_hash, index)
+                    for index, url_hash in enumerate(hashes)
+                ]
             )
 
         result = asyncio.run(run_scout("run-1", request_fn=complete_response))
@@ -135,7 +138,9 @@ class ScoutPipelineTests(TemporaryDatabaseTestCase):
         self.assertEqual((result.analyzed, result.selected), (6, 5))
         self.assertEqual(len(rows), 5)
         self.assertEqual([row[2] for row in rows], urls[:5])
-        self.assertNotIn("model.invalid", json.dumps([json.loads(row[5]) for row in rows]))
+        self.assertNotIn(
+            "model.invalid", json.dumps([json.loads(row[5]) for row in rows])
+        )
 
 
 if __name__ == "__main__":

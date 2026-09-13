@@ -56,7 +56,9 @@ class SieveTests(TemporaryDatabaseTestCase):
         result = asyncio.run(run_sieve("run-1", request_fn=complete_response))
 
         self.assertEqual((result.evaluated, result.kept, result.discarded), (2, 1, 1))
-        self.assertEqual([row[0] for row in get_keep_signals("run-1")], [self.hashes[0]])
+        self.assertEqual(
+            [row[0] for row in get_keep_signals("run-1")], [self.hashes[0]]
+        )
 
     def test_rejects_duplicate_response_hashes(self):
         async def duplicate_response(prompt):
@@ -79,6 +81,7 @@ class SieveTests(TemporaryDatabaseTestCase):
         ]
         for invalid in invalid_values:
             with self.subTest(invalid=invalid):
+
                 async def invalid_response(prompt, value=invalid):
                     return json.dumps(
                         [

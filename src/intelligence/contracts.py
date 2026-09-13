@@ -3,12 +3,11 @@
 import json
 import re
 from dataclasses import dataclass
-
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing import Literal
 
-from ..errors import ResponseValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from ..errors import ResponseValidationError
 
 FENCED_JSON_PATTERN = re.compile(
     r"^\s*```(?:json)?\s*(.*?)\s*```\s*$",
@@ -73,7 +72,9 @@ def validate_sieve_decisions(value: list) -> list[SieveDecision]:
     try:
         return [SieveDecision.model_validate(item) for item in value]
     except (ValidationError, TypeError) as exc:
-        raise ResponseValidationError("Sieve response violated its JSON contract") from exc
+        raise ResponseValidationError(
+            "Sieve response violated its JSON contract"
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -124,7 +125,9 @@ def validate_scout_analyses(value: list) -> list[ScoutAnalysis]:
     try:
         return [ScoutAnalysis.model_validate(item) for item in value]
     except (ValidationError, TypeError) as exc:
-        raise ResponseValidationError("Scout response violated its JSON contract") from exc
+        raise ResponseValidationError(
+            "Scout response violated its JSON contract"
+        ) from exc
 
 
 @dataclass(frozen=True)

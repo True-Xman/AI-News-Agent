@@ -9,7 +9,6 @@ from ..storage.operations import get_unprocessed_raw_signals, update_signal_filt
 from .contracts import SieveResult, parse_json_value, validate_sieve_decisions
 from .gemini_client import send_gemini_request
 
-
 SIEVE_INPUT_LIMIT = 50
 SIEVE_BATCH_SIZE = 5
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "sieve_prompt.md"
@@ -51,7 +50,9 @@ async def run_sieve(
         expected_hashes = {candidate["url_hash"] for candidate in candidates}
 
         if len(response_hashes) != len(set(response_hashes)):
-            raise ResponseValidationError("Sieve response contains duplicate URL hashes")
+            raise ResponseValidationError(
+                "Sieve response contains duplicate URL hashes"
+            )
         if set(response_hashes) != expected_hashes:
             raise ResponseValidationError(
                 "Sieve response hashes do not exactly match the submitted batch"

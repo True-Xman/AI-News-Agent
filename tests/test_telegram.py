@@ -5,7 +5,6 @@ import httpx
 
 from src.reporting.telegram import TelegramClient
 
-
 REPORT = (
     "<b>AI SIGNAL SCOUT</b>\n"
     "AUTONOMOUS AI INTELLIGENCE BRIEF\n"
@@ -22,13 +21,17 @@ class TelegramClientTests(unittest.TestCase):
 
         def handler(request):
             payloads.append(json.loads(request.content))
-            return httpx.Response(200, json={"ok": True, "result": {"message_id": 987654}})
+            return httpx.Response(
+                200, json={"ok": True, "result": {"message_id": 987654}}
+            )
 
         transport = httpx.MockTransport(handler)
         telegram = TelegramClient("secret-bot-token", "private-channel-id")
-        with httpx.Client(transport=transport) as client:
-            with self.assertLogs(level="INFO") as captured:
-                sent = telegram.send_message(REPORT, client=client)
+        with (
+            httpx.Client(transport=transport) as client,
+            self.assertLogs(level="INFO") as captured,
+        ):
+            sent = telegram.send_message(REPORT, client=client)
 
         self.assertTrue(sent)
         self.assertEqual(len(payloads), 1)
@@ -53,9 +56,11 @@ class TelegramClientTests(unittest.TestCase):
             )
         )
         telegram = TelegramClient("secret-bot-token", "private-channel-id")
-        with httpx.Client(transport=transport) as client:
-            with self.assertLogs("src.reporting.telegram", level="ERROR") as captured:
-                sent = telegram.send_message(REPORT, client=client)
+        with (
+            httpx.Client(transport=transport) as client,
+            self.assertLogs("src.reporting.telegram", level="ERROR") as captured,
+        ):
+            sent = telegram.send_message(REPORT, client=client)
 
         self.assertFalse(sent)
         self.assertNotIn("private diagnostic detail", "\n".join(captured.output))

@@ -7,7 +7,6 @@ from src.collectors.rss_collector import collect_rss
 from src.config.config_loader import SourceItem
 from tests.helpers import TemporaryDatabaseTestCase
 
-
 FIXTURE_BYTES = Path("tests/fixtures/sample_feed.xml").read_bytes()
 
 

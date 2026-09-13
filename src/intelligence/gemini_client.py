@@ -9,7 +9,6 @@ from google.genai.errors import APIError
 
 from ..errors import ConfigurationError, ExternalServiceError, ResponseValidationError
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,4 +63,3 @@ async def send_gemini_request(
             ) from e
 
     raise ExternalServiceError("Gemini request exhausted all retries")
-

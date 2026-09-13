@@ -13,7 +13,6 @@ import httpx
 from ..models.raw_signal import RawSignal
 from ..storage.operations import insert_raw_signal
 
-
 MAX_ITEM_AGE_DAYS = 7
 MAX_FUTURE_SKEW_HOURS = 24
 MAX_SNIPPET_CHARS = 1500
@@ -92,14 +91,18 @@ def collect_rss(
 
     try:
         feed = feedparser.parse(response.content)
-    except Exception:
+    except Exception:  # noqa: BLE001 - feedparser exposes no stable exception hierarchy
         logger.warning("Source %s failed: parse_error", source_item.name)
-        return SourceCollectionResult(source_item.name, False, error_category="parse_error")
+        return SourceCollectionResult(
+            source_item.name, False, error_category="parse_error"
+        )
 
     entries = list(feed.entries)
     if feed.bozo and not entries:
         logger.warning("Source %s failed: parse_error", source_item.name)
-        return SourceCollectionResult(source_item.name, False, error_category="parse_error")
+        return SourceCollectionResult(
+            source_item.name, False, error_category="parse_error"
+        )
 
     oldest_allowed = current_time - timedelta(days=MAX_ITEM_AGE_DAYS)
     newest_allowed = current_time + timedelta(hours=MAX_FUTURE_SKEW_HOURS)

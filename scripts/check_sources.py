@@ -10,7 +10,6 @@ from pathlib import Path
 
 import httpx
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -49,9 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             now = datetime.now(timezone.utc)
             with httpx.Client() as client:
                 for source in sources:
-                    results.append(
-                        collect_rss(source, run_id, client=client, now=now)
-                    )
+                    results.append(collect_rss(source, run_id, client=client, now=now))
         finally:
             if previous_db_path is None:
                 os.environ.pop("SIGNALS_DB_PATH", None)
@@ -63,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     for result in results:
         print(
             f"{result.source_name[:28]:<28} "
-            f"{str(result.healthy):<8} "
+            f"{result.healthy!s:<8} "
             f"{result.entries_parsed:>6} "
             f"{result.recent_entries:>6}  "
             f"{result.error_category or '-'}"
@@ -71,7 +68,9 @@ def main(argv: list[str] | None = None) -> int:
 
     healthy = sum(result.healthy for result in results)
     ratio = healthy / len(results) if results else 0
-    print(f"Healthy sources: {healthy}/{len(results)} ({ratio:.0%}); required: {args.threshold:.0%}")
+    print(
+        f"Healthy sources: {healthy}/{len(results)} ({ratio:.0%}); required: {args.threshold:.0%}"
+    )
     return 0 if ratio >= args.threshold else 1
 
 

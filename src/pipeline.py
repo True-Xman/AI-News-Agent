@@ -26,7 +26,6 @@ from .reporting.telegram import TelegramClient
 from .storage.database import init_db
 from .storage.operations import get_storage_counts, get_top_scored_signals
 
-
 SOURCE_HEALTH_THRESHOLD = 0.60
 REPORT_LIMIT = 5
 
@@ -115,8 +114,13 @@ async def run_pipeline(
             if result.healthy:
                 summary.healthy_sources += 1
 
-        if summary.healthy_sources / summary.configured_sources < SOURCE_HEALTH_THRESHOLD:
-            raise ExternalServiceError("Configured RSS source health is below 60 percent")
+        if (
+            summary.healthy_sources / summary.configured_sources
+            < SOURCE_HEALTH_THRESHOLD
+        ):
+            raise ExternalServiceError(
+                "Configured RSS source health is below 60 percent"
+            )
 
         sieve_result = await active_dependencies.run_sieve(summary.run_id)
         summary.sieve_evaluated = sieve_result.evaluated

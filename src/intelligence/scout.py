@@ -16,7 +16,6 @@ from .contracts import (
 )
 from .gemini_client import send_gemini_request
 
-
 SCOUT_INPUT_LIMIT = 15
 REPORT_LIMIT = 5
 MAX_PER_SOURCE_FIRST_PASS = 2

@@ -15,9 +15,11 @@ class GeminiClientTests(unittest.TestCase):
         from src.errors import ConfigurationError
         from src.intelligence.gemini_client import send_gemini_request
 
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(ConfigurationError, "GOOGLE_API_KEY"):
-                asyncio.run(send_gemini_request("test"))
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            self.assertRaisesRegex(ConfigurationError, "GOOGLE_API_KEY"),
+        ):
+            asyncio.run(send_gemini_request("test"))
 
 
 if __name__ == "__main__":

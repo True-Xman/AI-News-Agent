@@ -1,12 +1,10 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 from ..intelligence.contracts import ScoreBreakdown
 
 
 class ScoredSignal(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     url_hash: str
     title: str
     url: str

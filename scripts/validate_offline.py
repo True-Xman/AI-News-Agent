@@ -10,7 +10,6 @@ from pathlib import Path
 
 import httpx
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -21,7 +20,6 @@ from src.intelligence.sieve import run_sieve
 from src.pipeline import PipelineDependencies, run_pipeline
 from src.storage.database import init_db
 from src.storage.operations import get_storage_counts, get_top_scored_signals
-
 
 FIXTURE_BYTES = (PROJECT_ROOT / "tests" / "fixtures" / "sample_feed.xml").read_bytes()
 FIXED_NOW = datetime(2026, 9, 13, 12, 0, tzinfo=timezone.utc)
@@ -152,8 +150,10 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     try:
         asyncio.run(_run_validation())
-    except Exception as exc:
-        print(f"FAIL — offline validation stopped: {type(exc).__name__}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - executable validation boundary
+        print(
+            f"FAIL — offline validation stopped: {type(exc).__name__}", file=sys.stderr
+        )
         return 1
     return 0
 

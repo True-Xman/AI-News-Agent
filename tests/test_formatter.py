@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from src.errors import ResponseValidationError
 from src.reporting.formatter import format_report, strip_telegram_html, validate_report
 
-
 SAMPLE_SIGNAL = {
     "title": "Verified capability update",
     "score": 84.5,

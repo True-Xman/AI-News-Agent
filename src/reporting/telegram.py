@@ -7,7 +7,6 @@ import httpx
 
 from ..errors import ConfigurationError
 
-
 logger = logging.getLogger(__name__)
 # Telegram credentials are embedded in the Bot API URL, so third-party request
 # logging must never emit that URL. This module provides its own sanitized logs.
