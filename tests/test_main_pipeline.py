@@ -1,6 +1,7 @@
 import unittest
 import os
 import sys
+from unittest.mock import patch
 
 # Ensure root directory is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,7 +10,7 @@ class TestMainPipeline(unittest.TestCase):
 
     def test_main_imports(self):
         """Verify all main pipeline components import cleanly."""
-        try:
+        with patch.dict(os.environ, {}, clear=True):
             from src.config.config_loader import load_sources
             from src.collectors.rss_collector import collect_rss
             from src.storage.database import init_db
@@ -19,8 +20,6 @@ class TestMainPipeline(unittest.TestCase):
             from src.reporting.formatter import format_persian_report
             from src.reporting.telegram import TelegramClient
             import src.main
-        except ImportError as e:
-            self.fail(f"Pipeline import failed: {e}")
 
     def test_environment_variable_handling(self):
         """Verify TelegramClient raises clear error when environment variables are missing."""

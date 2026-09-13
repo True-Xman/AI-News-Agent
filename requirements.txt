@@ -1,8 +1,7 @@
-# AI Signal Scout - Dependencies
-openai>=1.0.0
-httpx>=0.24.0
-pydantic>=2.0.0
-python-dotenv>=1.0.0
-pyyaml>=6.0
-feedparser>=6.0
-google-genai
+# AI Signal Scout - Runtime dependencies
+httpx>=0.28,<1
+pydantic>=2.12,<3
+python-dotenv>=1.1,<2
+pyyaml>=6,<7
+feedparser>=6,<7
+google-genai>=2,<3
