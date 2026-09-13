@@ -2,34 +2,79 @@ name: AI Signal Scout Daily Agent
 
 on:
   schedule:
-    # 17:30 UTC daily = 21:00 Tehran Time (UTC+3:30)
-    - cron: '30 17 * * *'
+    # 17:30 UTC daily = 21:00 Tehran time.
+    - cron: "30 17 * * *"
   workflow_dispatch:
+    inputs:
+      deliver_report:
+        description: Send a valid current-run report to Telegram
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-signal-scout-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: python -m pip install -r requirements.txt
 
-      - name: Execute AI Signal Scout Pipeline
+      - name: Run unit and offline integration tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Remove test-generated summary
+        run: rm -f artifacts/run_summary.json
+
+      - name: Restore SQLite state
+        id: restore-db
+        uses: actions/cache/restore@v6
+        with:
+          path: data/signals.db
+          key: ai-signal-scout-db-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ai-signal-scout-db-${{ runner.os }}-${{ github.ref_name }}-
+
+      - name: Execute live AI Signal Scout pipeline
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          PYTHONPATH: .
-        run: |
-          python src/main.py
+          STATE_RESTORED: ${{ steps.restore-db.outputs.cache-matched-key != '' }}
+        run: >-
+          python -m src.main
+          --deliver-report "${{ github.event_name == 'schedule' || inputs.deliver_report }}"
+          --summary-path artifacts/run_summary.json
+
+      - name: Upload sanitized run evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: signal-scout-evidence-${{ github.run_id }}
+          path: artifacts/run_summary.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Save SQLite state
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: data/signals.db
+          key: ai-signal-scout-db-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}

@@ -1,22 +1,33 @@
-Your task: Analyze the following AI signal and decide whether it should be kept for deeper analysis or discarded as noise.
+# AI Signal Scout: Sieve
 
-Signal Details:
-- Title: {{title}}
-- Source: {{source}}
-- Summary: {{summary}}
+Classify every supplied AI-news candidate as `KEEP` or `DISCARD` for deeper analysis.
 
-Filter Criteria (Score each 0-1):
-1. Agent Relevance
-2. Capability Change
-3. Real-World Impact
-4. Security Implications
-5. Unexpected Behavior
-6. X Discussion Potential
+Score each criterion from 0.0 through 1.0:
 
-Output (JSON only):
+1. `agent_relevance`
+2. `capability_change`
+3. `real_world_impact`
+4. `security_implications`
+5. `unexpected_behavior`
+6. `discussion_potential`
+
+Return JSON only: one array with exactly one object for every input candidate. Preserve each input `url_hash` exactly. Do not add, omit, or duplicate candidates. Every `reason` must be concise English even when the source text is not English.
+
+Each object must have this exact shape:
+
+```json
 {
-  "decision": "KEEP" | "DISCARD",
-  "reason": "explanation",
-  "confidence": 0.0-1.0,
-  "scores": { ... }
+  "url_hash": "input hash",
+  "decision": "KEEP",
+  "reason": "Concise English reason",
+  "confidence": 0.85,
+  "scores": {
+    "agent_relevance": 0.9,
+    "capability_change": 0.8,
+    "real_world_impact": 0.7,
+    "security_implications": 0.2,
+    "unexpected_behavior": 0.5,
+    "discussion_potential": 0.8
+  }
 }
+```

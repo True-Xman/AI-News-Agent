@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+
 
 class RawSignal(BaseModel):
     url: str
@@ -7,11 +7,11 @@ class RawSignal(BaseModel):
     source: str
     source_id: int
     found_at: float
-    snippet: Optional[str] = None
-    category: Optional[str] = None
-    raw_text: Optional[str] = None
-    filter_decision: Optional[str] = None
-    filter_reason: Optional[str] = None
-    filter_confidence: Optional[float] = None
-    filter_scores: Optional[str] = None
-    filter_processed_at: Optional[str] = None
+    snippet: str | None = None
+    category: str | None = None
+    raw_text: str | None = None
+    filter_decision: str | None = None
+    filter_reason: str | None = None
+    filter_confidence: float | None = None
+    filter_scores: str | None = None
+    filter_processed_at: str | None = None
