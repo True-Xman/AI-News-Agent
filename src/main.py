@@ -1,115 +1,74 @@
+"""Command-line entry point for the AI Signal Scout pipeline."""
+
+import argparse
 import asyncio
 import logging
 import os
 import sys
-import uuid
 
-# Configure UTF-8 for console output on Windows
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
+from dotenv import load_dotenv
 
-from src.config.config_loader import load_sources
-from src.collectors.rss_collector import collect_rss
-from src.storage.database import init_db
-from src.storage.operations import (
-    get_top_scored_signals,
-    get_unprocessed_raw_signals,
-    get_keep_signals
-)
-from src.intelligence.sieve import run_sieve
-from src.intelligence.scout import run_scout
-from src.reporting.formatter import format_report
-from src.reporting.telegram import TelegramClient
-import json
+from .errors import PipelineError
+from .pipeline import run_pipeline
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
 logger = logging.getLogger("AI-Signal-Scout")
 
-async def run_pipeline():
-    run_id = str(uuid.uuid4())
-    logger.info(f"Pipeline run_id: {run_id}")
-    logger.info("Starting AI Signal Scout Pipeline...")
 
-    # 1. Initialize Database
-    init_db()
+def _boolean_argument(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise argparse.ArgumentTypeError("expected true or false")
 
-    # 2. Load Sources & Collect Signals
-    sources = load_sources("sources.yaml")
-    logger.info(f"Loaded {len(sources)} sources from configuration.")
-    total_collected = 0
-    for src in sources:
-        try:
-            signals = collect_rss(src, run_id=run_id)
-            total_collected += len(signals)
-            logger.info(f"Fetched {len(signals)} items from {src.name}")
-        except Exception as e:
-            logger.error(f"Error fetching source {src.name}: {e}")
 
-    logger.info(f"Total raw signals collected in this run: {total_collected}")
-    # Diagnostic logging: check raw_signals for this run_id
-    from src.storage.database import get_connection
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM raw_signals WHERE run_id = ?", (run_id,))
-    count_total = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM raw_signals WHERE run_id = ? AND filter_decision IS NULL", (run_id,))
-    count_unprocessed = cursor.fetchone()[0]
-    conn.close()
-    logger.info(f"Diagnostic: run_id={run_id}")
-    logger.info(f"Diagnostic: total raw_signals for this run_id = {count_total}")
-    logger.info(f"Diagnostic: raw_signals with filter_decision IS NULL = {count_unprocessed}")
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the AI Signal Scout pipeline")
+    parser.add_argument(
+        "--deliver-report",
+        type=_boolean_argument,
+        default=True,
+        metavar="true|false",
+        help="send a valid current-run report to Telegram (default: true)",
+    )
+    parser.add_argument(
+        "--summary-path",
+        default="artifacts/run_summary.json",
+        help="write sanitized run evidence to this path",
+    )
+    return parser
 
-    # 3. Sieve Noise Filtering (Gemini Flash)
-    unprocessed = get_unprocessed_raw_signals(run_id=run_id, limit=50)
-    if unprocessed:
-        logger.info(f"Running Sieve filtering on {len(unprocessed)} raw signals...")
-        success = await run_sieve(run_id=run_id)
-        if not success:
-            logger.error("Pipeline stopped due to Gemini quota exhaustion.")
-            return
-    else:
-        logger.info("No unprocessed raw signals for Sieve filtering.")
 
-    # 4. Scout Analysis & Scoring (Gemini Flash)
-    keep_signals = get_keep_signals(run_id=run_id)
-    if keep_signals:
-        logger.info(f"Running Scout deep analysis on {len(keep_signals)} candidate signals...")
-        await run_scout(run_id=run_id)
-    else:
-        logger.info("No candidate signals ready for Scout analysis.")
+def cli(argv: list[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+        load_dotenv()
 
-    # 5. Generate the English report for this run.
-    top_rows = get_top_scored_signals(run_id, limit=5)
-    if not top_rows:
-        logger.warning("No scored signals available to generate report.")
-        return
+    args = build_parser().parse_args(argv)
+    try:
+        summary = asyncio.run(
+            run_pipeline(
+                deliver_report=args.deliver_report,
+                summary_path=args.summary_path,
+            )
+        )
+    except PipelineError as exc:
+        logger.error("Pipeline failed: %s", type(exc).__name__)
+        return 1
+    except Exception as exc:
+        logger.error("Unexpected pipeline failure: %s", type(exc).__name__)
+        return 1
 
-    formatted_signals = []
-    for row in top_rows:
-        # row[5] contains analysis_json string
-        analysis_data = json.loads(row[5])
-        formatted_signals.append(analysis_data)
+    logger.info("Pipeline completed with status %s", summary.status)
+    return 0
 
-    report_text = format_report(formatted_signals)
-    logger.info(f"Generated English report ({len(report_text)} chars).")
-
-    # 6. Deliver to Telegram
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-
-    if not bot_token or not channel_id:
-        logger.warning("Telegram credentials not configured. Skipping delivery.")
-        print("\n--- REPORT OUTPUT ---\n")
-        print(report_text)
-        print("\n---------------------\n")
-        return
-
-    client = TelegramClient(bot_token=bot_token, channel_id=channel_id)
-    success = client.send_message(report_text)
-    if success:
-        logger.info("Report delivered successfully to Telegram!")
-    else:
-        logger.error("Failed to deliver report to Telegram.")
 
 if __name__ == "__main__":
-    asyncio.run(run_pipeline())
+    raise SystemExit(cli())

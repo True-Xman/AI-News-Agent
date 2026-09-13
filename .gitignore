@@ -9,6 +9,9 @@ __pycache__/
 # Database
 data/*.db
 
+# Generated public-safe workflow evidence
+artifacts/run_summary.json
+
 # Virtual environments
 venv/
 .venv/
