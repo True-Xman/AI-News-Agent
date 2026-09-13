@@ -1,123 +1,74 @@
+"""Validated first-stage relevance filtering for fresh AI signals."""
+
 import json
-import logging
-from .gemini_client import send_gemini_request
-from ..utils.organization import get_organization
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+
+from ..errors import ResponseValidationError
 from ..storage.operations import get_unprocessed_raw_signals, update_signal_filter
+from .contracts import SieveResult, parse_json_value, validate_sieve_decisions
+from .gemini_client import send_gemini_request
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-with open("prompts/sieve_prompt.md", "r", encoding="utf-8") as f:
-    SIEVE_PROMPT_TEMPLATE = f.read()
+SIEVE_INPUT_LIMIT = 50
+SIEVE_BATCH_SIZE = 5
+PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "sieve_prompt.md"
+SIEVE_PROMPT_TEMPLATE = PROMPT_PATH.read_text(encoding="utf-8")
 
-async def run_sieve(run_id: str):
-    rows = get_unprocessed_raw_signals(run_id=run_id, limit=50) # Increase pull size to allow better selection diversity
-    # Debug log: check distribution
-    from collections import Counter
-    source_counts = Counter([get_organization(None, row[2]) for row in rows])
-    logger.info(f"Sieve: Raw signals loaded: {len(rows)}. Distribution: {dict(source_counts)}")
-    for org, count in source_counts.items():
-        sample = [row[1] for row in rows if get_organization(None, row[2]) == org][:2]
-        logger.info(f"Sieve: Sample from {org}: {sample}")
 
+async def run_sieve(
+    run_id: str,
+    request_fn: Callable[[str], Awaitable[str]] | None = None,
+) -> SieveResult:
+    """Classify every selected row or fail without partially applying a batch."""
+    rows = get_unprocessed_raw_signals(run_id=run_id, limit=SIEVE_INPUT_LIMIT)
     if not rows:
-        return False # Indicate failure/stop
+        return SieveResult(evaluated=0, kept=0, discarded=0)
 
-    # Pre-filter logic: Keep only relevant signals based on title keywords
-    keywords = ["AI", "agent", "security", "model", "research", "LLM", "safety", "vulnerability"]
-    filtered_rows = []
-    for row in rows:
-        title = row[1]
-        if any(kw.lower() in title.lower() for kw in keywords):
-            filtered_rows.append(row)
-    
-    if not filtered_rows:
-        return True # Finished, but nothing to keep
+    request = request_fn or send_gemini_request
+    kept = discarded = 0
 
-    logger.info(f"Sieve: Candidates before diversity selection: {len(filtered_rows)}")
+    for offset in range(0, len(rows), SIEVE_BATCH_SIZE):
+        batch = rows[offset : offset + SIEVE_BATCH_SIZE]
+        candidates = [
+            {
+                "url_hash": row[0],
+                "title": row[1],
+                "source": row[2],
+                "snippet": row[5] or "",
+            }
+            for row in batch
+        ]
+        prompt = (
+            f"{SIEVE_PROMPT_TEMPLATE}\n\n"
+            "Candidates:\n"
+            f"{json.dumps(candidates, ensure_ascii=False)}"
+        )
 
-    # Group filtered candidates by detected source/organization to distribute and select a diverse subset
-    # Detailed Logging
-    for i, row in enumerate(filtered_rows):
-        # Assuming row structure based on insert_raw_signal:
-        # 0: url_hash, 1: title, 2: source, 3: source_id, 4: found_at, 5: snippet
-        # But wait, raw_signals table has more columns...
-        # Let's check the schema again. 
-        # Column count: url_hash (0), title (1), source (2), source_id (3), found_at (4), snippet (5)
-        # Yes, row[0] is hash, row[1] is title, row[2] is source
-        
-        # Actually, let's log everything
-        logger.info(f"Signal {i}: Title: {row[1]}, Source: {row[2]}, URL Hash: {row[0]}")
-    
+        raw_value = parse_json_value(await request(prompt), list)
+        decisions = validate_sieve_decisions(raw_value)
+        response_hashes = [decision.url_hash for decision in decisions]
+        expected_hashes = {candidate["url_hash"] for candidate in candidates}
 
-    by_source = {}
-    for row in filtered_rows:
-        # row[0] is url_hash, row[1] is title, row[2] is raw source description
-        # We don't store full URL in raw_signals table, so we pass fallback (row[2]) to get_organization
-        source_org = get_organization(None, row[2] or "unknown")
-        by_source.setdefault(source_org, []).append(row)
+        if len(response_hashes) != len(set(response_hashes)):
+            raise ResponseValidationError("Sieve response contains duplicate URL hashes")
+        if set(response_hashes) != expected_hashes:
+            raise ResponseValidationError(
+                "Sieve response hashes do not exactly match the submitted batch"
+            )
 
-    # Round-robin selection of candidates to ensure high diversity up to a maximum of 25 candidates
-    selected_rows = []
-    sources_cycle = list(by_source.keys())
-    while len(selected_rows) < 25 and any(by_source.values()):
-        for src in list(sources_cycle):
-            if by_source[src]:
-                selected_rows.append(by_source[src].pop(0))
+        for decision in decisions:
+            update_signal_filter(
+                decision.url_hash,
+                decision.decision,
+                decision.reason,
+                decision.confidence,
+                decision.scores,
+                run_id=run_id,
+            )
+            if decision.decision == "KEEP":
+                kept += 1
             else:
-                sources_cycle.remove(src)
-            if len(selected_rows) >= 25:
-                break
+                discarded += 1
 
-    represented_orgs = {get_organization(None, row[2] or "unknown") for row in selected_rows}
-    logger.info(f"Sieve: Final candidates sent to Sieve (Gemini): {len(selected_rows)}. Organizations represented: {represented_orgs}")
-
-
-    # Batch process signals (e.g., 5 at a time)
-    batch_size = 5
-    for i in range(0, len(selected_rows), batch_size):
-        batch = selected_rows[i:i + batch_size]
-        
-        candidates = []
-        for row in batch:
-            url_hash, title, source, source_id, found_at, snippet = row[:6]
-            candidates.append({
-                "url_hash": url_hash,
-                "title": title,
-                "source": source,
-                "snippet": snippet or ""
-            })
-        
-        prompt = f"{SIEVE_PROMPT_TEMPLATE}\n\nEvaluate these candidates and return a JSON list of decisions:\n{json.dumps(candidates)}"
-        
-        try:
-            response_text = await send_gemini_request(prompt)
-            # Find JSON in response
-            start = response_text.find("[")
-            end = response_text.rfind("]") + 1
-            if start == -1 or end == 0:
-                logger.error("Failed to find JSON array in response")
-                continue
-                
-            data = json.loads(response_text[start:end])
-            
-            for item in data:
-                url_hash = item.get("url_hash")
-                decision = item.get("decision")
-                if decision in ["KEEP", "DISCARD"]:
-                    update_signal_filter(
-                        url_hash, 
-                        decision, 
-                        item.get("reason", ""), 
-                        item.get("confidence", 0.0),
-                        item.get("scores"),
-                        run_id=run_id
-                    )
-        except Exception as e:
-            if "quota" in str(e).lower() or "exceeded" in str(e).lower():
-                logger.error("Sieve stopped due to Gemini quota exhaustion.")
-                return False
-            logger.error(f"Error sieving batch starting with {batch[0][1]}: {e}")
-    return True
-
+    return SieveResult(evaluated=len(rows), kept=kept, discarded=discarded)
