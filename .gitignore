@@ -1,5 +1,7 @@
 # Environment secrets
 .env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -8,6 +10,8 @@ __pycache__/
 
 # Database
 data/*.db
+data/*.db-shm
+data/*.db-wal
 
 # Generated public-safe workflow evidence
 artifacts/run_summary.json
