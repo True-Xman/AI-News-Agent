@@ -13,6 +13,9 @@ data/*.db
 venv/
 .venv/
 
+# Isolated development worktrees
+.worktrees/
+
 # OS files
 .DS_Store
 Thumbs.db
