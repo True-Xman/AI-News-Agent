@@ -1,11 +1,18 @@
 import sqlite3
 import os
 
-DB_PATH = "data/signals.db"
+def get_db_path() -> str:
+    """Return the configured SQLite path at call time."""
+    return os.environ.get("SIGNALS_DB_PATH", "data/signals.db")
+
+
+def get_connection():
+    return sqlite3.connect(get_db_path())
 
 def init_db():
-    os.makedirs("data", exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     # Sources table
@@ -60,9 +67,19 @@ def init_db():
         cursor.execute("ALTER TABLE processed_signals ADD COLUMN run_id TEXT")
     except sqlite3.OperationalError:
         pass
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_raw_run_decision "
+        "ON raw_signals(run_id, filter_decision)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_raw_source_found "
+        "ON raw_signals(source_id, found_at)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_processed_run_score "
+        "ON processed_signals(run_id, score)"
+    )
     
     conn.commit()
     conn.close()
-
-def get_connection():
-    return sqlite3.connect(DB_PATH)

@@ -1,95 +1,189 @@
 import hashlib
 import json
-import logging
-from .database import get_connection
+from collections import OrderedDict
+
 from ..models.raw_signal import RawSignal
 from ..utils.organization import get_organization
+from .database import get_connection
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-def insert_raw_signal(signal: RawSignal, run_id: str):
+def insert_raw_signal(signal: RawSignal, run_id: str) -> bool:
+    """Insert a new URL once and report whether this call created the row."""
     conn = get_connection()
     cursor = conn.cursor()
     url_hash = hashlib.md5(signal.url.encode()).hexdigest()
     try:
-        cursor.execute("""
-        INSERT OR IGNORE INTO raw_signals (url_hash, title, source, source_id, found_at, snippet, url, run_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (url_hash, signal.title, signal.source, signal.source_id, signal.found_at, signal.snippet, signal.url, run_id))
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO raw_signals
+                (url_hash, title, source, source_id, found_at, snippet, url, run_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                url_hash,
+                signal.title,
+                signal.source,
+                signal.source_id,
+                signal.found_at,
+                signal.snippet,
+                signal.url,
+                run_id,
+            ),
+        )
+        inserted = cursor.rowcount == 1
+        conn.commit()
+        return inserted
+    finally:
+        conn.close()
+
+
+def _round_robin_by_source(rows: list[tuple], limit: int) -> list[tuple]:
+    """Return one row per organization per pass, preserving stable row order."""
+    if limit < 1:
+        return []
+
+    grouped: OrderedDict[str, list[tuple]] = OrderedDict()
+    for row in rows:
+        organization = get_organization(row[11], row[2] or "unknown")
+        grouped.setdefault(organization, []).append(row)
+
+    balanced: list[tuple] = []
+    round_index = 0
+    while len(balanced) < limit:
+        added = False
+        for source_rows in grouped.values():
+            if round_index < len(source_rows):
+                balanced.append(source_rows[round_index])
+                added = True
+                if len(balanced) == limit:
+                    return balanced
+        if not added:
+            break
+        round_index += 1
+    return balanced
+
+
+def get_unprocessed_raw_signals(run_id: str, limit: int = 50) -> list[tuple]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT * FROM raw_signals
+            WHERE filter_decision IS NULL AND run_id = ?
+            ORDER BY source_id ASC, found_at DESC, url_hash ASC
+            """,
+            (run_id,),
+        )
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return _round_robin_by_source(rows, limit)
+
+
+def update_signal_filter(
+    url_hash: str,
+    decision: str,
+    reason: str,
+    confidence: float = 0.0,
+    scores=None,
+    run_id: str | None = None,
+) -> None:
+    if run_id is None:
+        raise ValueError("run_id is required when updating a signal")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE raw_signals
+            SET filter_decision = ?, filter_reason = ?, filter_confidence = ?,
+                filter_scores = ?, filter_processed_at = datetime('now')
+            WHERE url_hash = ? AND run_id = ?
+            """,
+            (
+                decision,
+                reason,
+                confidence,
+                json.dumps(scores) if scores else None,
+                url_hash,
+                run_id,
+            ),
+        )
         conn.commit()
     finally:
         conn.close()
 
-def get_unprocessed_raw_signals(run_id: str, limit=None):
+
+def get_keep_signals(run_id: str, limit: int = 15) -> list[tuple]:
     conn = get_connection()
     cursor = conn.cursor()
-    # Migration-safe: include both specific run_id and legacy NULL run_id
-    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision IS NULL AND (run_id = ? OR run_id IS NULL)", (run_id,))
-    all_rows = cursor.fetchall()
-    conn.close()
-    
-    if not all_rows:
-        return []
+    try:
+        cursor.execute(
+            """
+            SELECT * FROM raw_signals
+            WHERE filter_decision = 'KEEP' AND run_id = ?
+            ORDER BY filter_confidence DESC, found_at DESC, source_id ASC, url_hash ASC
+            """,
+            (run_id,),
+        )
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return _round_robin_by_source(rows, limit)
 
-    # Group by organization
-    by_source = {}
-    for row in all_rows:
-        source_org = get_organization(None, row[2] or "unknown")
-        by_source.setdefault(source_org, []).append(row)
 
-    # Balance retrieval (e.g., max 20 per organization)
-    max_per_org = 20
-    balanced_rows = []
-    
-    logger.info(f"Sieve: Fetching balanced pool by organization for run {run_id}:")
-    for org, rows in by_source.items():
-        count = min(len(rows), max_per_org)
-        balanced_rows.extend(rows[:count])
-        logger.info(f" - {org}: {count} signals")
-    
-    # Apply limit after balancing if provided
-    if limit:
-        return balanced_rows[:limit]
-    
-    return balanced_rows
-
-def update_signal_filter(url_hash: str, decision: str, reason: str, confidence: float = 0.0, scores=None, run_id: str = None):
+def insert_processed_signal(
+    title: str,
+    url: str,
+    score: float,
+    topic_fingerprint: str,
+    analysis_json,
+    run_id: str,
+) -> None:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    UPDATE raw_signals 
-    SET filter_decision = ?, filter_reason = ?, filter_confidence = ?, filter_scores = ?, filter_processed_at = datetime('now')
-    WHERE url_hash = ? AND run_id = ?
-    """, (decision, reason, confidence, json.dumps(scores) if scores else None, url_hash, run_id))
-    conn.commit()
-    conn.close()
-...
+    try:
+        cursor.execute(
+            """
+            INSERT INTO processed_signals
+                (title, url, score, topic_fingerprint, analysis_json, reported_at, run_id)
+            VALUES (?, ?, ?, ?, ?, datetime('now'), ?)
+            """,
+            (title, url, score, topic_fingerprint, json.dumps(analysis_json), run_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
-def get_keep_signals(run_id: str):
+
+def get_top_scored_signals(run_id: str, limit: int = 5) -> list[tuple]:
     conn = get_connection()
     cursor = conn.cursor()
-    # Migration-safe: include both specific run_id and legacy NULL run_id
-    cursor.execute("SELECT * FROM raw_signals WHERE filter_decision = 'KEEP' AND url_hash NOT IN (SELECT url FROM processed_signals WHERE run_id = ?) AND (run_id = ? OR run_id IS NULL)", (run_id, run_id))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
+    try:
+        cursor.execute(
+            """
+            SELECT * FROM processed_signals
+            WHERE run_id = ?
+            ORDER BY score DESC, id ASC
+            LIMIT ?
+            """,
+            (run_id, limit),
+        )
+        return cursor.fetchall()
+    finally:
+        conn.close()
 
-def insert_processed_signal(title: str, url: str, score: float, topic_fingerprint: str, analysis_json: str, run_id: str):
+
+def get_storage_counts() -> dict[str, int]:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-    INSERT INTO processed_signals (title, url, score, topic_fingerprint, analysis_json, reported_at, run_id)
-    VALUES (?, ?, ?, ?, ?, datetime('now'), ?)
-    """, (title, url, score, topic_fingerprint, json.dumps(analysis_json), run_id))
-    conn.commit()
-    conn.close()
-
-def get_top_scored_signals(limit=5):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM processed_signals ORDER BY score DESC LIMIT ?", (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
+    try:
+        cursor.execute("SELECT COUNT(*) FROM raw_signals")
+        raw_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM processed_signals")
+        processed_count = cursor.fetchone()[0]
+        return {"raw_signals": raw_count, "processed_signals": processed_count}
+    finally:
+        conn.close()
